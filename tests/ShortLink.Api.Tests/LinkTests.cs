@@ -89,6 +89,100 @@ public sealed class LinkTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // --- ISliceValidator<T> (#4: AOT validator path) ---
+
+    [Fact]
+    public async Task CreateLink_ftp_scheme_returns_400_from_slice_validator()
+    {
+        // ISliceValidator fires after [Required,Url] DataAnnotations pass for absolute URIs.
+        // ftp:// passes Url attribute (it is an absolute URI) but is blocked by CreateLinkRequestValidator.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = JsonContent.Create(new { targetUrl = "ftp://example.com/file.zip" });
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateLink_localhost_url_returns_400_from_slice_validator()
+    {
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = JsonContent.Create(new { targetUrl = "http://localhost/admin" });
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateLink_private_ip_url_returns_400_from_slice_validator()
+    {
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = JsonContent.Create(new { targetUrl = "http://192.168.1.1/secret" });
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // --- [FromHeader] binding (#8: SliceAotArgumentBinder header-bind path) ---
+
+    [Fact]
+    public async Task CreateLink_with_request_id_header_echoes_it_in_response()
+    {
+        // Exercises [FromHeader(Name="X-Request-Id")] in Handle signature.
+        // The value is echoed as requestId in the response body.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links")
+        {
+            Content = JsonContent.Create(new { targetUrl = "https://example.com" }),
+        };
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Headers.Add("X-Request-Id", "trace-abc-123");
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("trace-abc-123", doc.RootElement.GetProperty("requestId").GetString());
+    }
+
+    [Fact]
+    public async Task CreateLink_without_request_id_header_returns_null_requestId()
+    {
+        // [FromHeader] optional (string?) — absent header → null in response.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links")
+        {
+            Content = JsonContent.Create(new { targetUrl = "https://example.com" }),
+        };
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(body);
+        // requestId property should be absent or null when header is not sent
+        if (doc.RootElement.TryGetProperty("requestId", out var requestIdProp))
+        {
+            Assert.Equal(JsonValueKind.Null, requestIdProp.ValueKind);
+        }
+    }
+
     // --- ListLinks ---
 
     [Fact]
