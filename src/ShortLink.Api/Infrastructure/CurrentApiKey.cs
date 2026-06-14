@@ -1,6 +1,11 @@
 namespace ShortLink.Api.Infrastructure;
 
-public sealed class CurrentApiKey
+public interface ICurrentApiKey
+{
+    string? OwnerId { get; set; }
+}
+
+public sealed class CurrentApiKey : ICurrentApiKey
 {
     public string? OwnerId { get; set; }
 }

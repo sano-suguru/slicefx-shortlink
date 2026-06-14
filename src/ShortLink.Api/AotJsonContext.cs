@@ -8,5 +8,9 @@ namespace ShortLink.Api;
 [JsonSerializable(typeof(GetHealth.Response), TypeInfoPropertyName = "GetHealthResponse")]
 [JsonSerializable(typeof(CreateLink.Request))]
 [JsonSerializable(typeof(CreateLink.Response), TypeInfoPropertyName = "CreateLinkResponse")]
+[JsonSerializable(typeof(ListLinks.Response), TypeInfoPropertyName = "ListLinksResponse")]
+[JsonSerializable(typeof(ListLinks.LinkItem))]
+[JsonSerializable(typeof(GetLinkStats.Response), TypeInfoPropertyName = "GetLinkStatsResponse")]
+[JsonSerializable(typeof(GetLinkStats.DailyClicksItem))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 internal sealed partial class AotJsonContext : JsonSerializerContext { }
