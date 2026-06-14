@@ -1,0 +1,31 @@
+app = "slicefx-shortlink"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "src/ShortLink.Api/Dockerfile"
+  [build.args]
+    TARGETPLATFORM = "linux/amd64"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[env]
+  ASPNETCORE_URLS = "http://+:8080"
+  # Set at deploy time (fly secrets set):
+  #   ConnectionStrings__Postgres  (Neon postgres:// URL — app normalizes to Npgsql keyword format)
+  #   SeedApiKey
+  #   BaseUrl  (e.g. https://slicefx-shortlink.fly.dev)
