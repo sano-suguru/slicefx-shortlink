@@ -11,7 +11,7 @@ Backend: `src/ShortLink.Api/` — SliceFx ASP.NET NativeAOT app + Postgres (raw 
 
 - **NuGet only — `<ProjectReference>` to slicefx/ is prohibited.**
 - When a SliceFx bug is found: switch to `~/dev/slicefx` session → fix → `gh workflow run publish.yml` → bump `<PackageReference Version>` here.
-- Current version: `0.1.0-preview.14`.
+- Current version: `0.1.0-preview.15`.
 
 ## Commands
 
@@ -25,7 +25,7 @@ dotnet run --project src/ShortLink.Api
 # Local AOT gate — IL2026/IL3050 surface here even on macOS
 dotnet publish src/ShortLink.Api -c Release -r osx-arm64 -p:PublishAot=true
 
-# Portability check — /api/* should be portable, /r/{code} aspnet-only
+# Portability check — all 6 routes should be portable
 dotnet tool run slicefx -- routes --format table
 
 # Docker build + smoke (real NativeAOT binary, linux-x64)
@@ -39,11 +39,17 @@ docker compose up -d
 
 # (M4+) JSON context check
 dotnet tool run slicefx -- json-context --check --project src/ShortLink.Api
+
+# Regenerate OpenAPI document (run after changing feature request/response shapes)
+dotnet tool run slicefx -- openapi --project src/ShortLink.Api --output docs/openapi.json --force
+
+# Regenerate typed C# client (run after regenerating openapi.json)
+dotnet tool run slicefx -- client csharp --project src/ShortLink.Api --output src/ShortLink.ApiClient/SliceApiClient.g.cs --namespace ShortLink.Api.Client --force
 ```
 
 ## Architecture
 
-One-file-one-feature (SliceFx pattern). Most features are **portable** (`[SliceFilter<T>]` + `SliceResult<T>`). `GET /r/{code}` is intentionally **aspnet-only** (`[Filter<RateLimitFilter>]` needs `Retry-After` header — ISliceFilter v1 cannot mutate post-handler response headers).
+One-file-one-feature (SliceFx pattern). All 6 features are **portable** (`[SliceFilter<T>]` + `SliceResult<T>`). `GET /r/{code}` was aspnet-only before preview.15; now portable via `ISliceFilter` `RateLimitFilter` using `context.ClientIp` and `context.ResponseHeaders`.
 
 ```
 src/ShortLink.Api/
@@ -58,10 +64,10 @@ src/ShortLink.Api/
     DeleteLink.cs           DELETE /api/links/{id}  (API-key auth, portable)
     GetLinkStats.cs         GET  /api/links/{id}/stats  (API-key auth, portable)
   Features/Redirect/        (M2+)
-    FollowLink.cs           GET  /r/{code}  (public, aspnet-only — RateLimitFilter)
+    FollowLink.cs           GET  /r/{code}  (public, portable — ISliceFilter RateLimitFilter)
   Filters/                  (M3+)
     ApiKeyAuthFilter.cs     ISliceFilter — portable; resolves key → CurrentApiKey write-back
-    RateLimitFilter.cs      IEndpointFilter — aspnet-only; Retry-After + ForwardedHeaders
+    RateLimitFilter.cs      ISliceFilter — portable; context.ClientIp + context.ResponseHeaders
   Infrastructure/           (M2+)
     ILinkStore.cs / PostgresLinkStore.cs
     IClickStore.cs / PostgresClickStore.cs

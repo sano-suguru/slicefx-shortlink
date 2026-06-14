@@ -2,16 +2,15 @@ using System.Collections.Concurrent;
 
 namespace ShortLink.Api.Filters;
 
-public sealed class RateLimitFilter : IEndpointFilter
+public sealed class RateLimitFilter : ISliceFilter
 {
     private const int Limit = 20;
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
     private static readonly ConcurrentDictionary<string, Bucket> Buckets = new();
 
-    public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    public async ValueTask<SliceFilterResult> InvokeAsync(SliceFilterContext context, SliceFilterDelegate next)
     {
-        var http = context.HttpContext;
-        var ip = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var ip = context.ClientIp ?? "unknown";
         var now = DateTimeOffset.UtcNow;
 
         var bucket = Buckets.GetOrAdd(ip, _ => new Bucket(Limit, now.Add(Window)));
@@ -19,17 +18,15 @@ public sealed class RateLimitFilter : IEndpointFilter
 
         if (remaining < 0)
         {
-            // Short-circuit: set all headers before return (response not yet started)
             var retryAfter = (int)Math.Ceiling((bucket.ResetAt - now).TotalSeconds);
-            http.Response.Headers.RetryAfter = retryAfter.ToString();
-            http.Response.Headers["X-RateLimit-Limit"] = Limit.ToString();
-            http.Response.Headers["X-RateLimit-Remaining"] = "0";
-            return Results.StatusCode(429);
+            context.ResponseHeaders["Retry-After"] = retryAfter.ToString();
+            context.ResponseHeaders["X-RateLimit-Limit"] = Limit.ToString();
+            context.ResponseHeaders["X-RateLimit-Remaining"] = "0";
+            return SliceFilterResult.ShortCircuit(SliceResult.Problem(429, "Too Many Requests"));
         }
 
-        // Set X-RateLimit-* BEFORE next() — post-handler header mutation is not possible in AOT
-        http.Response.Headers["X-RateLimit-Limit"] = Limit.ToString();
-        http.Response.Headers["X-RateLimit-Remaining"] = remaining.ToString();
+        context.ResponseHeaders["X-RateLimit-Limit"] = Limit.ToString();
+        context.ResponseHeaders["X-RateLimit-Remaining"] = remaining.ToString();
 
         return await next(context).ConfigureAwait(false);
     }

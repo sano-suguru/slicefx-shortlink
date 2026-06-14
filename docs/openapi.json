@@ -39,7 +39,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Response"
+                  "$ref": "#/components/schemas/ListLinks_Response"
                 }
               }
             }
@@ -53,12 +53,22 @@
         "tags": [
           "Links"
         ],
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Request"
+                "$ref": "#/components/schemas/CreateLink_Request"
               }
             }
           }
@@ -174,6 +184,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Referer",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "User-Agent",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -181,13 +207,23 @@
             "description": "Successful response."
           }
         },
-        "x-slicefx-portability": "partial",
-        "x-slicefx-portability-reason": "endpoint filters do not run in the WASI path"
+        "x-slicefx-portability": "portable"
       }
     }
   },
   "components": {
     "schemas": {
+      "CreateLink_Request": {
+        "type": "object",
+        "properties": {
+          "targetUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetUrl"
+        ]
+      },
       "CreateLink_Response": {
         "type": "object",
         "properties": {
@@ -202,6 +238,9 @@
             "type": "integer",
             "format": "int64"
           },
+          "requestId": {
+            "type": "string"
+          },
           "shortUrl": {
             "type": "string"
           },
@@ -215,23 +254,6 @@
           "id",
           "shortUrl",
           "targetUrl"
-        ]
-      },
-      "DailyClicksItem": {
-        "type": "object",
-        "properties": {
-          "count": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          }
-        },
-        "required": [
-          "count",
-          "date"
         ]
       },
       "GetHealth_Response": {
@@ -250,6 +272,23 @@
           "status"
         ]
       },
+      "GetLinkStats_DailyClicksItem": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "count",
+          "date"
+        ]
+      },
       "GetLinkStats_Response": {
         "type": "object",
         "properties": {
@@ -259,7 +298,7 @@
           "daily": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DailyClicksItem"
+              "$ref": "#/components/schemas/GetLinkStats_DailyClicksItem"
             }
           },
           "id": {
@@ -278,7 +317,7 @@
           "totalClicks"
         ]
       },
-      "LinkItem": {
+      "ListLinks_LinkItem": {
         "type": "object",
         "properties": {
           "code": {
@@ -307,24 +346,13 @@
           "targetUrl"
         ]
       },
-      "Request": {
-        "type": "object",
-        "properties": {
-          "targetUrl": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "targetUrl"
-        ]
-      },
-      "Response": {
+      "ListLinks_Response": {
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/LinkItem"
+              "$ref": "#/components/schemas/ListLinks_LinkItem"
             }
           },
           "page": {

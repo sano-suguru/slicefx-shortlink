@@ -98,7 +98,7 @@ public partial class SliceApiClient
             _prepareRequest = prepareRequest;
         }
 
-        public async Task<ShortLink.Api.Features.Links.CreateLink.Response> CreateLinkAsync(ShortLink.Api.Features.Links.CreateLink.Request req, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.CreateLink.Response>> CreateLinkAsync(ShortLink.Api.Features.Links.CreateLink.Request req, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links";
             using var __message = new HttpRequestMessage(new HttpMethod("POST"), __url);
@@ -109,11 +109,14 @@ public partial class SliceApiClient
             {
                 await SliceApiClient.__ThrowApiException(__response, "CreateLink", cancellationToken).ConfigureAwait(false);
             }
-            return await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.CreateLinkResponse, cancellationToken).ConfigureAwait(false)
+            var __statusCode = (int)__response.StatusCode;
+            var __location = __response.Headers.Location;
+            var __body = await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.CreateLinkResponse, cancellationToken).ConfigureAwait(false)
                 ?? throw new HttpRequestException("Route 'Links.CreateLink' returned an empty response body.");
+            return new SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.CreateLink.Response>(__body, __statusCode, __location);
         }
 
-        public async Task DeleteLinkAsync(long id, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse> DeleteLinkAsync(long id, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links/{SliceApiClient.FormatRouteValue(id)}";
             using var __message = new HttpRequestMessage(new HttpMethod("DELETE"), __url);
@@ -123,9 +126,12 @@ public partial class SliceApiClient
             {
                 await SliceApiClient.__ThrowApiException(__response, "DeleteLink", cancellationToken).ConfigureAwait(false);
             }
+            var __statusCode = (int)__response.StatusCode;
+            var __location = __response.Headers.Location;
+            return new SliceApiClient.__SliceClientResponse(__statusCode, __location);
         }
 
-        public async Task<ShortLink.Api.Features.Links.GetLinkStats.Response> GetLinkStatsAsync(long id, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.GetLinkStats.Response>> GetLinkStatsAsync(long id, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links/{SliceApiClient.FormatRouteValue(id)}/stats";
             using var __message = new HttpRequestMessage(HttpMethod.Get, __url);
@@ -135,11 +141,14 @@ public partial class SliceApiClient
             {
                 await SliceApiClient.__ThrowApiException(__response, "GetLinkStats", cancellationToken).ConfigureAwait(false);
             }
-            return await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.GetLinkStatsResponse, cancellationToken).ConfigureAwait(false)
+            var __statusCode = (int)__response.StatusCode;
+            var __location = __response.Headers.Location;
+            var __body = await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.GetLinkStatsResponse, cancellationToken).ConfigureAwait(false)
                 ?? throw new HttpRequestException("Route 'Links.GetLinkStats' returned an empty response body.");
+            return new SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.GetLinkStats.Response>(__body, __statusCode, __location);
         }
 
-        public async Task<ShortLink.Api.Features.Links.ListLinks.Response> ListLinksAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.ListLinks.Response>> ListLinksAsync(int page, int pageSize, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links";
             var __query = new List<string>();
@@ -153,8 +162,11 @@ public partial class SliceApiClient
             {
                 await SliceApiClient.__ThrowApiException(__response, "ListLinks", cancellationToken).ConfigureAwait(false);
             }
-            return await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.ListLinksResponse, cancellationToken).ConfigureAwait(false)
+            var __statusCode = (int)__response.StatusCode;
+            var __location = __response.Headers.Location;
+            var __body = await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.ListLinksResponse, cancellationToken).ConfigureAwait(false)
                 ?? throw new HttpRequestException("Route 'Links.ListLinks' returned an empty response body.");
+            return new SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.ListLinks.Response>(__body, __statusCode, __location);
         }
     }
 
@@ -169,7 +181,7 @@ public partial class SliceApiClient
             _prepareRequest = prepareRequest;
         }
 
-        public async Task FollowLinkAsync(string code, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse> FollowLinkAsync(string code, CancellationToken cancellationToken = default)
         {
             var __url = $"/r/{SliceApiClient.FormatRouteValue(code)}";
             using var __message = new HttpRequestMessage(new HttpMethod("GET"), __url);
@@ -179,6 +191,9 @@ public partial class SliceApiClient
             {
                 await SliceApiClient.__ThrowApiException(__response, "FollowLink", cancellationToken).ConfigureAwait(false);
             }
+            var __statusCode = (int)__response.StatusCode;
+            var __location = __response.Headers.Location;
+            return new SliceApiClient.__SliceClientResponse(__statusCode, __location);
         }
     }
 
@@ -199,6 +214,42 @@ public partial class SliceApiClient
             : base(message, null, statusCode)
         {
             Problem = problem;
+        }
+    }
+
+    /// <summary>Carries a typed response body together with the HTTP status code and optional Location header.</summary>
+    public readonly struct __SliceClientResponse<T>
+    {
+        /// <summary>The deserialized response body.</summary>
+        public T Value { get; }
+        /// <summary>The HTTP status code (e.g. 200, 201).</summary>
+        public int StatusCode { get; }
+        /// <summary>The Location header value, or <see langword="null"/> when absent.</summary>
+        public Uri? Location { get; }
+        /// <param name="value">Deserialized response body.</param>
+        /// <param name="statusCode">HTTP status code.</param>
+        /// <param name="location">Location header (e.g. for 201 Created responses).</param>
+        public __SliceClientResponse(T value, int statusCode, Uri? location)
+        {
+            Value = value;
+            StatusCode = statusCode;
+            Location = location;
+        }
+    }
+
+    /// <summary>Carries the HTTP status code and optional Location header for status-only responses.</summary>
+    public readonly struct __SliceClientResponse
+    {
+        /// <summary>The HTTP status code (e.g. 204).</summary>
+        public int StatusCode { get; }
+        /// <summary>The Location header value, or <see langword="null"/> when absent.</summary>
+        public Uri? Location { get; }
+        /// <param name="statusCode">HTTP status code.</param>
+        /// <param name="location">Location header.</param>
+        public __SliceClientResponse(int statusCode, Uri? location)
+        {
+            StatusCode = statusCode;
+            Location = location;
         }
     }
 }

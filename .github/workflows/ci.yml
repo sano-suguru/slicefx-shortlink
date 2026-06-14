@@ -65,7 +65,7 @@ jobs:
             'Links.DeleteLink': 'portable',
             'Links.GetLinkStats': 'portable',
             'Health.GetHealth': 'portable',
-            'Redirect.FollowLink': 'partial',
+            'Redirect.FollowLink': 'portable',
           }
           failed = False
           for route in routes:
