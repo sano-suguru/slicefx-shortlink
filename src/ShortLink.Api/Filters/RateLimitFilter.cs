@@ -21,7 +21,7 @@ public sealed class RateLimitFilter : IEndpointFilter
         {
             // Short-circuit: set all headers before return (response not yet started)
             var retryAfter = (int)Math.Ceiling((bucket.ResetAt - now).TotalSeconds);
-            http.Response.Headers["Retry-After"] = retryAfter.ToString();
+            http.Response.Headers.RetryAfter = retryAfter.ToString();
             http.Response.Headers["X-RateLimit-Limit"] = Limit.ToString();
             http.Response.Headers["X-RateLimit-Remaining"] = "0";
             return Results.StatusCode(429);

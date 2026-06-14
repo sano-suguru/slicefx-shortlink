@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    name: Build, test, AOT gate
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: shortlink
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shortlink"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore ShortLink.slnx
+
+      - name: Build (warnings-as-errors)
+        run: dotnet build ShortLink.slnx -c Release --no-restore
+
+      - name: Test (integration, PG service container)
+        run: dotnet test ShortLink.slnx -c Release --no-build --no-restore
+        env:
+          ConnectionStrings__Postgres: "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=shortlink;SSL Mode=Prefer"
+          SeedApiKey: "ci-seed-key-for-tests"
+          BaseUrl: "http://localhost"
+
+      - name: Install SliceFx CLI
+        run: dotnet tool restore
+
+      - name: Check JSON context (SLICE071 prevention)
+        run: dotnet tool run slicefx -- json-context --check --project src/ShortLink.Api
+
+      - name: Check portability classification
+        run: |
+          dotnet tool run slicefx -- routes --format table --project src/ShortLink.Api
+          dotnet tool run slicefx -- routes --format json --project src/ShortLink.Api | \
+            python3 -c "
+          import json, sys
+          routes = json.load(sys.stdin)
+          expected = {
+            'Links.CreateLink': 'portable',
+            'Links.ListLinks': 'portable',
+            'Links.DeleteLink': 'portable',
+            'Links.GetLinkStats': 'portable',
+            'Health.GetHealth': 'portable',
+            'Redirect.FollowLink': 'partial',
+          }
+          failed = False
+          for route in routes:
+            name = route.get('endpointName', '')
+            got = route.get('portability', '')
+            want = expected.get(name)
+            if want is not None and got != want:
+              print(f'FAIL: {name} expected {want} got {got}')
+              failed = True
+          if failed:
+            sys.exit(1)
+          print('All portability classifications match expected values.')
+          "
+
+      - name: Format check
+        run: dotnet format ShortLink.slnx --verify-no-changes --severity info --exclude-diagnostics CS1591
+
+      - name: Install AOT build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      - name: NativeAOT publish gate (linux-x64)
+        run: dotnet publish src/ShortLink.Api/ShortLink.Api.csproj -c Release -r linux-x64
+        env:
+          ConnectionStrings__Postgres: "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=shortlink;SSL Mode=Prefer"
+          SeedApiKey: "ci-seed-key-for-tests"
+          BaseUrl: "http://localhost"
+
+      - name: Report binary size
+        run: |
+          size=$(stat -c%s src/ShortLink.Api/bin/Release/net10.0/linux-x64/publish/ShortLink.Api)
+          echo "Native binary size: $((size / 1024 / 1024)) MB (${size} bytes)"
+
+      - name: Docker build
+        run: docker build --platform linux/amd64 -f src/ShortLink.Api/Dockerfile -t shortlink-api:ci .
+
+      - name: Docker smoke test
+        run: |
+          docker run -d --name shortlink-ci \
+            -p 8080:8080 \
+            -e ConnectionStrings__Postgres="Host=172.17.0.1;Port=5432;Username=postgres;Password=postgres;Database=shortlink;SSL Mode=Prefer" \
+            -e SeedApiKey="ci-seed-key-for-tests" \
+            -e BaseUrl="http://localhost:8080" \
+            shortlink-api:ci
+
+          echo "Waiting for container to start..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Container is ready."
+              break
+            fi
+            if [ "$i" -eq 20 ]; then
+              echo "Container failed to start." && docker logs shortlink-ci && exit 1
+            fi
+            sleep 2
+          done
+
+          echo "--- Health check ---"
+          curl -sf http://localhost:8080/health | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['status']=='ok', d"
+
+          echo "--- Create link ---"
+          RESP=$(curl -sf -X POST http://localhost:8080/api/links \
+            -H "Content-Type: application/json" \
+            -H "X-Api-Key: ci-seed-key-for-tests" \
+            -d '{"targetUrl":"https://example.com"}')
+          echo "$RESP"
+          CODE=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['code'])")
+          ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+          echo "Created code=$CODE id=$ID"
+
+          echo "--- Follow link (expect 302) ---"
+          curl -si http://localhost:8080/r/$CODE | head -5
+          STATUS=$(curl -so /dev/null -w '%{http_code}' http://localhost:8080/r/$CODE)
+          if [ "$STATUS" != "302" ] && [ "$STATUS" != "200" ]; then
+            echo "Expected 302/200 for redirect, got $STATUS" && exit 1
+          fi
+
+          echo "--- Unknown code (expect 404) ---"
+          STATUS=$(curl -so /dev/null -w '%{http_code}' http://localhost:8080/r/XXXXXXX)
+          [ "$STATUS" = "404" ] || (echo "Expected 404, got $STATUS" && exit 1)
+
+          echo "--- Link stats ---"
+          curl -sf http://localhost:8080/api/links/$ID/stats \
+            -H "X-Api-Key: ci-seed-key-for-tests" | python3 -c "import json,sys; d=json.load(sys.stdin); assert 'totalClicks' in d, d"
+
+          echo "All smoke checks passed."
+          docker stop shortlink-ci
