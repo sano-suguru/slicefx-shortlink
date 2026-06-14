@@ -1,0 +1,30 @@
+# Build outputs
+bin/
+obj/
+publish/
+
+# NuGet
+*.nupkg
+.nuget/
+
+# User-specific files
+*.user
+*.suo
+.vs/
+.idea/
+*.DotSettings.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Rider / VS Code
+.vscode/
+*.sln.DotSettings
+
+# Test results
+TestResults/
+coverage/
+
+# Spike / scratch work
+spike/
