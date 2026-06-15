@@ -18,6 +18,11 @@ internal static class TestDb
 
     public static async Task ClearLinksAsync(NpgsqlDataSource ds, CancellationToken ct = default)
     {
+        // Bootstrap schema before truncating so this works on a fresh database (e.g. CI service container).
+        // schema.sql uses CREATE TABLE IF NOT EXISTS and the seed insert uses ON CONFLICT DO NOTHING,
+        // so this call is idempotent when tables already exist.
+        await Db.BootstrapAsync(ds, SeedApiKey, ct);
+
         await using var conn = await ds.OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "TRUNCATE links, clicks RESTART IDENTITY CASCADE";
