@@ -148,12 +148,14 @@ public partial class SliceApiClient
             return new SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.GetLinkStats.Response>(__body, __statusCode, __location);
         }
 
-        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.ListLinks.Response>> ListLinksAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.ListLinks.Response>> ListLinksAsync(int? page, int? pageSize, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links";
             var __query = new List<string>();
-            __query.Add("page=" + SliceApiClient.FormatRouteValue(page));
-            __query.Add("pageSize=" + SliceApiClient.FormatRouteValue(pageSize));
+            if (page is not null)
+                __query.Add("page=" + SliceApiClient.FormatRouteValue(page));
+            if (pageSize is not null)
+                __query.Add("pageSize=" + SliceApiClient.FormatRouteValue(pageSize));
             __url += "?" + string.Join("&", __query);
             using var __message = new HttpRequestMessage(HttpMethod.Get, __url);
             _prepareRequest(__message);

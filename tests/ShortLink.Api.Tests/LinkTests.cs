@@ -186,6 +186,25 @@ public sealed class LinkTests : IAsyncLifetime
     // --- ListLinks ---
 
     [Fact]
+    public async Task ListLinks_without_query_string_returns_200_with_defaults()
+    {
+        // page/pageSize are now optional (int?) — omitting them must not return 400.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/links");
+        req.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        var response = await host.Client.SendAsync(req, ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(body);
+        // Defaults: page=1, pageSize=20
+        Assert.Equal(1, doc.RootElement.GetProperty("page").GetInt32());
+        Assert.Equal(20, doc.RootElement.GetProperty("pageSize").GetInt32());
+    }
+
+    [Fact]
     public async Task ListLinks_returns_paged_results()
     {
         await using var host = TestHostFactory.Create();
@@ -304,5 +323,100 @@ public sealed class LinkTests : IAsyncLifetime
         Assert.True(
             response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.NotFound,
             $"Expected 401 or 404 but got {response.StatusCode}");
+    }
+
+    // --- Tenant isolation (owner separation) ---
+    // These tests use SecondApiKey (a distinct valid key) to exercise the
+    // link.OwnerKeyHash != key.OwnerId 404 branch that was previously unreachable.
+
+    [Fact]
+    public async Task GetLinkStats_valid_key_but_different_owner_returns_404()
+    {
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Create a link owned by the seed key
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        createReq.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        createReq.Content = JsonContent.Create(new { targetUrl = "https://owner-isolation.example.com" });
+        var createResp = await host.Client.SendAsync(createReq, ct);
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var createBody = await createResp.Content.ReadAsStringAsync(ct);
+        using var createDoc = JsonDocument.Parse(createBody);
+        var id = createDoc.RootElement.GetProperty("id").GetInt64();
+
+        // Attempt to read stats with a different valid key → 404 (not 401 and not 200)
+        var statsReq = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{id}/stats");
+        statsReq.Headers.Add("X-Api-Key", TestDb.SecondApiKey);
+        var statsResp = await host.Client.SendAsync(statsReq, ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, statsResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteLink_valid_key_but_different_owner_returns_404()
+    {
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Create a link owned by the seed key
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        createReq.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        createReq.Content = JsonContent.Create(new { targetUrl = "https://delete-isolation.example.com" });
+        var createResp = await host.Client.SendAsync(createReq, ct);
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var createBody = await createResp.Content.ReadAsStringAsync(ct);
+        using var createDoc = JsonDocument.Parse(createBody);
+        var id = createDoc.RootElement.GetProperty("id").GetInt64();
+
+        // Attempt to delete with a different valid key → 404 (cross-owner delete rejected)
+        var deleteReq = new HttpRequestMessage(HttpMethod.Delete, $"/api/links/{id}");
+        deleteReq.Headers.Add("X-Api-Key", TestDb.SecondApiKey);
+        var deleteResp = await host.Client.SendAsync(deleteReq, ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, deleteResp.StatusCode);
+
+        // Verify the link still exists for the original owner
+        var statsReq = new HttpRequestMessage(HttpMethod.Get, $"/api/links/{id}/stats");
+        statsReq.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        var statsResp = await host.Client.SendAsync(statsReq, ct);
+        Assert.Equal(HttpStatusCode.OK, statsResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListLinks_returns_only_own_links()
+    {
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Create one link for each owner
+        var req1 = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        req1.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        req1.Content = JsonContent.Create(new { targetUrl = "https://owner1.example.com" });
+        await host.Client.SendAsync(req1, ct);
+
+        var req2 = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        req2.Headers.Add("X-Api-Key", TestDb.SecondApiKey);
+        req2.Content = JsonContent.Create(new { targetUrl = "https://owner2.example.com" });
+        await host.Client.SendAsync(req2, ct);
+
+        // Each owner should see only their own link
+        var listReq1 = new HttpRequestMessage(HttpMethod.Get, "/api/links");
+        listReq1.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        var listResp1 = await host.Client.SendAsync(listReq1, ct);
+        var body1 = await listResp1.Content.ReadAsStringAsync(ct);
+        using var doc1 = JsonDocument.Parse(body1);
+        var items1 = doc1.RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.All(items1, item =>
+            Assert.Contains("owner1.example.com", item.GetProperty("targetUrl").GetString()!));
+
+        var listReq2 = new HttpRequestMessage(HttpMethod.Get, "/api/links");
+        listReq2.Headers.Add("X-Api-Key", TestDb.SecondApiKey);
+        var listResp2 = await host.Client.SendAsync(listReq2, ct);
+        var body2 = await listResp2.Content.ReadAsStringAsync(ct);
+        using var doc2 = JsonDocument.Parse(body2);
+        var items2 = doc2.RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.All(items2, item =>
+            Assert.Contains("owner2.example.com", item.GetProperty("targetUrl").GetString()!));
     }
 }

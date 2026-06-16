@@ -68,7 +68,8 @@ public sealed class PostgresLinkStore(NpgsqlDataSource db) : ILinkStore
             """;
         cmd.Parameters.AddWithValue(ownerKeyHash);
         cmd.Parameters.AddWithValue(pageSize);
-        cmd.Parameters.AddWithValue((page - 1) * pageSize);
+        // Cast to long before multiplication to prevent int overflow for large page values.
+        cmd.Parameters.AddWithValue((long)(page - 1) * pageSize);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         var results = new List<LinkRecord>();
         while (await reader.ReadAsync(ct))

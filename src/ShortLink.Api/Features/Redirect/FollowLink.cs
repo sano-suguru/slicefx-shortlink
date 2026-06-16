@@ -22,11 +22,19 @@ public static class FollowLink
             return SliceResult.NotFound();
         }
 
-        await clicks.RecordAsync(
-            link.Id,
-            string.IsNullOrEmpty(referer) ? null : referer,
-            string.IsNullOrEmpty(userAgent) ? null : userAgent,
-            ct);
+        // Click recording is best-effort: an analytics failure must not block the redirect.
+        try
+        {
+            await clicks.RecordAsync(
+                link.Id,
+                string.IsNullOrEmpty(referer) ? null : referer,
+                string.IsNullOrEmpty(userAgent) ? null : userAgent,
+                ct);
+        }
+        catch (Exception)
+        {
+            // Intentionally swallowed — analytics outage must not affect redirect availability.
+        }
 
         return SliceResult.Redirect(link.TargetUrl);
     }

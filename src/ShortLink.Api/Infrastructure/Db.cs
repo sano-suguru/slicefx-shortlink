@@ -54,14 +54,16 @@ public static class Db
     private static string NormalizeUri(string uri)
     {
         var u = new Uri(uri);
+        // System.Uri returns percent-encoded userInfo — decode before passing to Npgsql.
+        // Neon postgres:// URLs frequently contain %-escaped characters in passwords.
         var userInfo = u.UserInfo.Split(':', 2);
         var b = new NpgsqlConnectionStringBuilder
         {
             Host = u.Host,
             Port = u.Port > 0 ? u.Port : 5432,
-            Username = userInfo.Length > 0 ? userInfo[0] : null,
-            Password = userInfo.Length > 1 ? userInfo[1] : null,
-            Database = u.AbsolutePath.TrimStart('/'),
+            Username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : null,
+            Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : null,
+            Database = Uri.UnescapeDataString(u.AbsolutePath.TrimStart('/')),
             SslMode = SslMode.Require,
         };
         return b.ConnectionString;

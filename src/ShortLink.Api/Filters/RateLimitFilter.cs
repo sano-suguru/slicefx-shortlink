@@ -8,10 +8,42 @@ public sealed class RateLimitFilter : ISliceFilter
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
     private static readonly ConcurrentDictionary<string, Bucket> Buckets = new();
 
+    // Periodic sweep: remove buckets whose window has fully expired to prevent unbounded growth.
+    // One sweep per window interval; lock ensures a single sweep at a time.
+    private static DateTimeOffset _nextSweep = DateTimeOffset.MinValue;
+    private static readonly Lock _sweepLock = new();
+
+    private static void SweepExpiredBuckets(DateTimeOffset now)
+    {
+        if (now < _nextSweep)
+        {
+            return;
+        }
+
+        lock (_sweepLock)
+        {
+            if (now < _nextSweep)
+            {
+                return;
+            }
+
+            _nextSweep = now.Add(Window);
+            foreach (var key in Buckets.Keys.ToList())
+            {
+                if (Buckets.TryGetValue(key, out var b) && b.IsExpired(now))
+                {
+                    Buckets.TryRemove(key, out _);
+                }
+            }
+        }
+    }
+
     public async ValueTask<SliceFilterResult> InvokeAsync(SliceFilterContext context, SliceFilterDelegate next)
     {
         var ip = context.ClientIp ?? "unknown";
         var now = DateTimeOffset.UtcNow;
+
+        SweepExpiredBuckets(now);
 
         var bucket = Buckets.GetOrAdd(ip, _ => new Bucket(Limit, now.Add(Window)));
         var remaining = bucket.Consume(Limit, now);
@@ -54,6 +86,16 @@ public sealed class RateLimitFilter : ISliceFilter
                 }
 
                 return --_remaining;
+            }
+        }
+
+        // A bucket is safe to remove when its current window has fully elapsed.
+        // If accessed again after removal, GetOrAdd will create a fresh bucket.
+        public bool IsExpired(DateTimeOffset now)
+        {
+            lock (this)
+            {
+                return now >= ResetAt;
             }
         }
     }
