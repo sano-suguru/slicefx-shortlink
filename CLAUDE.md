@@ -25,7 +25,7 @@ dotnet run --project src/ShortLink.Api
 # Local AOT gate — IL2026/IL3050 surface here even on macOS
 dotnet publish src/ShortLink.Api -c Release -r osx-arm64 -p:PublishAot=true
 
-# Portability check — all 6 routes should be portable
+# Portability check — all 7 routes should be portable
 dotnet tool run slicefx -- routes --format table
 
 # Docker build + smoke (real NativeAOT binary, linux-x64)
@@ -49,7 +49,7 @@ dotnet tool run slicefx -- client csharp --project src/ShortLink.Api --output sr
 
 ## Architecture
 
-One-file-one-feature (SliceFx pattern). All 6 features are **portable** (`[SliceFilter<T>]` + `SliceResult<T>`). `GET /r/{code}` was aspnet-only before preview.15; now portable via `ISliceFilter` `RateLimitFilter` using `context.ClientIp` and `context.ResponseHeaders`.
+One-file-one-feature (SliceFx pattern). All 7 features are **portable** (`[SliceFilter<T>]` + `SliceResult<T>`). `GET /r/{code}` was aspnet-only before preview.15; now portable via `ISliceFilter` `RateLimitFilter` using `context.ClientIp` and `context.ResponseHeaders`.
 
 ```
 src/ShortLink.Api/
@@ -57,7 +57,8 @@ src/ShortLink.Api/
   AotSetup.cs               [assembly: SliceAspNetAot]
   AotJsonContext.cs         [SliceJsonContext(SliceJsonTarget.AspNet)] + all body/response roots
   Features/Health/
-    GetHealth.cs            GET /health  (public, portable)
+    GetHealth.cs            GET /health        (public, portable — liveness, no DB)
+    GetReady.cs             GET /health/ready  (public, portable — readiness: SELECT 1)
   Features/Links/           (M2+)
     CreateLink.cs           POST /api/links     (API-key auth, portable)
     ListLinks.cs            GET  /api/links     (API-key auth, portable, paged)

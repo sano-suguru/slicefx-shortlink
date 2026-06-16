@@ -26,7 +26,7 @@ public sealed class PostgresClickStore(NpgsqlDataSource db) : IClickStore
 
         await using var dailyCmd = conn.CreateCommand();
         dailyCmd.CommandText = """
-            SELECT clicked_at::date AS day, COUNT(*) AS cnt
+            SELECT (clicked_at AT TIME ZONE 'UTC')::date AS day, COUNT(*) AS cnt
             FROM clicks
             WHERE link_id = $1
             GROUP BY day

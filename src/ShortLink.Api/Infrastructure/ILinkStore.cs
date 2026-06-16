@@ -8,5 +8,6 @@ public interface ILinkStore
     Task<LinkRecord?> FindByCodeAsync(string code, CancellationToken ct);
     Task<LinkRecord?> FindByIdAsync(long id, CancellationToken ct);
     Task<IReadOnlyList<LinkRecord>> ListByOwnerAsync(string ownerKeyHash, int page, int pageSize, CancellationToken ct);
+    Task<int> CountByOwnerAsync(string ownerKeyHash, CancellationToken ct);
     Task<bool> DeleteAsync(long id, string ownerKeyHash, CancellationToken ct);
 }

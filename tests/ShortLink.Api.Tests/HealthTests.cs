@@ -31,4 +31,16 @@ public sealed class HealthTests : IAsyncLifetime
         Assert.Equal("ok", doc.RootElement.GetProperty("status").GetString());
         Assert.True(doc.RootElement.TryGetProperty("at", out _));
     }
+
+    [Fact]
+    public async Task GetReady_returns_200_when_db_up()
+    {
+        // Requires a running Postgres (same as all other integration tests).
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var response = await host.Client.GetAsync("/health/ready", ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }

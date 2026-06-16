@@ -57,17 +57,27 @@ public sealed class CreateLinkRequestValidator : ISliceValidator<CreateLink.Requ
             return false;
         }
 
+        // Unwrap IPv4-mapped IPv6 (::ffff:10.0.0.1 etc.) before range checks.
+        if (ip.IsIPv4MappedToIPv6)
+        {
+            ip = ip.MapToIPv4();
+        }
+
         if (IPAddress.IsLoopback(ip))
         {
             return true;
         }
 
         var bytes = ip.GetAddressBytes();
-        if (bytes.Length != 4)
+
+        if (bytes.Length == 16)
         {
-            return false;
+            // IPv6: block link-local (fe80::/10), site-local (fec0::/10, deprecated),
+            // and ULA (fc00::/7).
+            return ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal || ip.IsIPv6UniqueLocal;
         }
 
+        // IPv4 private ranges
         // 10.0.0.0/8
         if (bytes[0] == 10)
         {

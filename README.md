@@ -18,6 +18,7 @@ Paired with [slicefx-inbox](https://github.com/sano-suguru/slicefx-inbox) which 
 | Portability snapshot CI assertion | `slicefx routes --format json` checked per push |
 | Typed client compilation | `slicefx client csharp` → `SliceApiClient.g.cs` |
 | distroless container AOT gate | `docker run` curl smoke in CI |
+| Liveness vs readiness separation | `GET /health` (liveness, no DB) + `GET /health/ready` (readiness, `SELECT 1`) wired to Fly health check |
 
 ## Portability snapshot
 
@@ -27,10 +28,11 @@ Links.ListLinks     portable   GET    /api/links
 Links.DeleteLink    portable   DELETE /api/links/{id}
 Links.GetLinkStats  portable   GET    /api/links/{id}/stats
 Health.GetHealth    portable   GET    /health
+Health.GetReady     portable   GET    /health/ready
 Redirect.FollowLink portable   GET    /r/{code}
 ```
 
-All 6 routes are `portable`. `/r/{code}` rate-limiting is implemented via `ISliceFilter` using `context.ClientIp` (per-client bucket key) and `context.ResponseHeaders` (`Retry-After`, `X-RateLimit-*`).
+All 7 routes are `portable`. `/r/{code}` rate-limiting is implemented via `ISliceFilter` using `context.ClientIp` (per-client bucket key) and `context.ResponseHeaders` (`Retry-After`, `X-RateLimit-*`).
 
 ## Measured numbers (linux-x64, 2026-06-14)
 

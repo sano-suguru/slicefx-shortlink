@@ -1,5 +1,6 @@
 extern alias ShortLinkApi;
 
+using ShortLinkApi::ShortLink.Api.Filters;
 using ShortLinkApi::ShortLink.Api.Infrastructure;
 
 namespace ShortLink.Api.Tests.Helpers;
@@ -21,6 +22,10 @@ internal static class TestDb
 
     public static async Task ClearLinksAsync(NpgsqlDataSource ds, CancellationToken ct = default)
     {
+        // Reset in-process rate-limit state so tests are isolated from each other.
+        // Tests run serially (DisableTestParallelization in AssemblyInfo.cs), so this is safe.
+        RateLimitFilter.ResetForTests();
+
         // Bootstrap schema before truncating so this works on a fresh database (e.g. CI service container).
         // schema.sql uses CREATE TABLE IF NOT EXISTS and the seed insert uses ON CONFLICT DO NOTHING,
         // so this call is idempotent when tables already exist.

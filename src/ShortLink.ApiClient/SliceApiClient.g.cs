@@ -85,6 +85,21 @@ public partial class SliceApiClient
             return await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.GetHealthResponse, cancellationToken).ConfigureAwait(false)
                 ?? throw new HttpRequestException("Route 'Health.GetHealth' returned an empty response body.");
         }
+
+        public async Task<SliceApiClient.__SliceClientResponse> GetReadyAsync(CancellationToken cancellationToken = default)
+        {
+            var __url = $"/health/ready";
+            using var __message = new HttpRequestMessage(new HttpMethod("GET"), __url);
+            _prepareRequest(__message);
+            using var __response = await _http.SendAsync(__message, cancellationToken).ConfigureAwait(false);
+            if (!__response.IsSuccessStatusCode)
+            {
+                await SliceApiClient.__ThrowApiException(__response, "GetReady", cancellationToken).ConfigureAwait(false);
+            }
+            var __statusCode = (int)__response.StatusCode;
+            var __location = __response.Headers.Location;
+            return new SliceApiClient.__SliceClientResponse(__statusCode, __location);
+        }
     }
 
     public sealed class LinksClient

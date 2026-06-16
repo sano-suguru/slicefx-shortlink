@@ -26,4 +26,8 @@
     <Content Include="Db\schema.sql" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ShortLink.Api.Tests" />
+  </ItemGroup>
+
 </Project>

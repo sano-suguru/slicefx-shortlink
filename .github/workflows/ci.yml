@@ -65,16 +65,23 @@ jobs:
             'Links.DeleteLink': 'portable',
             'Links.GetLinkStats': 'portable',
             'Health.GetHealth': 'portable',
+            'Health.GetReady': 'portable',
             'Redirect.FollowLink': 'portable',
           }
           failed = False
+          seen = set()
           for route in routes:
             name = route.get('endpointName', '')
             got = route.get('portability', '')
-            want = expected.get(name)
-            if want is not None and got != want:
-              print(f'FAIL: {name} expected {want} got {got}')
-              failed = True
+            if name in expected:
+              seen.add(name)
+              if got != expected[name]:
+                print(f'FAIL: {name} expected {expected[name]} got {got}')
+                failed = True
+          missing = set(expected) - seen
+          if missing:
+            print(f'FAIL: expected routes missing from manifest: {sorted(missing)}')
+            failed = True
           if failed:
             sys.exit(1)
           print('All portability classifications match expected values.')
@@ -122,22 +129,37 @@ jobs:
             sleep 2
           done
 
-          echo "--- Health check ---"
+          echo "--- Health check (liveness) ---"
           curl -sf http://localhost:8080/health | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['status']=='ok', d"
 
-          echo "--- Create link ---"
+          echo "--- Readiness check (DB reachable) ---"
+          STATUS=$(curl -so /dev/null -w '%{http_code}' http://localhost:8080/health/ready)
+          [ "$STATUS" = "200" ] || (echo "Expected 200 for /health/ready, got $STATUS" && exit 1)
+
+          echo "--- Create link (AOT [FromHeader] X-Request-Id binding) ---"
           RESP=$(curl -sf -X POST http://localhost:8080/api/links \
             -H "Content-Type: application/json" \
             -H "X-Api-Key: ci-seed-key-for-tests" \
+            -H "X-Request-Id: smoke-aot-header-123" \
             -d '{"targetUrl":"https://example.com"}')
           echo "$RESP"
           CODE=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['code'])")
           ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
           echo "Created code=$CODE id=$ID"
+          # Verify [FromHeader] binding in real NativeAOT binary — requestId must echo the header value.
+          echo "$RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d.get('requestId')=='smoke-aot-header-123', f'[FromHeader] AOT binding failed: requestId={d.get(\"requestId\")!r}'
+print('[FromHeader] AOT binding: OK')
+"
 
-          echo "--- Follow link (expect 302) ---"
-          curl -si http://localhost:8080/r/$CODE | head -5
-          STATUS=$(curl -so /dev/null -w '%{http_code}' http://localhost:8080/r/$CODE)
+          echo "--- Follow link (expect 302, AOT Referer/User-Agent [FromHeader] binding) ---"
+          curl -si http://localhost:8080/r/$CODE \
+            -H "Referer: https://smoke.example" \
+            -H "User-Agent: smoke-agent/1.0" | head -5
+          STATUS=$(curl -so /dev/null -w '%{http_code}' http://localhost:8080/r/$CODE \
+            -H "Referer: https://smoke.example" -H "User-Agent: smoke-agent/1.0")
           if [ "$STATUS" != "302" ] && [ "$STATUS" != "200" ]; then
             echo "Expected 302/200 for redirect, got $STATUS" && exit 1
           fi

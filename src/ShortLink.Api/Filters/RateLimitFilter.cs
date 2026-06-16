@@ -2,6 +2,15 @@ using System.Collections.Concurrent;
 
 namespace ShortLink.Api.Filters;
 
+/// <summary>
+/// In-memory, per-IP sliding-window rate limiter for the redirect endpoint.
+/// <para>
+/// <b>Single-instance / in-memory only.</b> When Fly.io auto-scales to multiple machines,
+/// each machine enforces its own independent limit — the cluster-wide effective limit is
+/// <c>Limit × machine count</c>, not <c>Limit</c>. For a scale-to-zero / single-machine
+/// deployment this is the intended behaviour.
+/// </para>
+/// </summary>
 public sealed class RateLimitFilter : ISliceFilter
 {
     private const int Limit = 20;
@@ -32,11 +41,18 @@ public sealed class RateLimitFilter : ISliceFilter
             {
                 if (Buckets.TryGetValue(key, out var b) && b.IsExpired(now))
                 {
+                    // R-2 note: there is a narrow TOCTOU window here — a concurrent Consume that
+                    // rolls the window forward between IsExpired and TryRemove will silently lose
+                    // its in-flight window consumption. Impact is at most one extra window of
+                    // full-limit capacity for that IP; acceptable for a soft limiter.
                     Buckets.TryRemove(key, out _);
                 }
             }
         }
     }
+
+    /// <summary>Clears all rate-limit buckets. For use in tests only.</summary>
+    internal static void ResetForTests() => Buckets.Clear();
 
     public async ValueTask<SliceFilterResult> InvokeAsync(SliceFilterContext context, SliceFilterDelegate next)
     {

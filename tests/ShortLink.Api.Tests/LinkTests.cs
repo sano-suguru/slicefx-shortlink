@@ -135,6 +135,38 @@ public sealed class LinkTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task CreateLink_ipv6_ula_returns_400_from_slice_validator()
+    {
+        // fd00::/8 is ULA (Unique Local Address) — private IPv6 range.
+        // Previously slipped through because bytes.Length != 4 short-circuited to false.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = JsonContent.Create(new { targetUrl = "http://[fd00::1]/admin" });
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateLink_ipv4_mapped_ipv6_returns_400_from_slice_validator()
+    {
+        // ::ffff:10.0.0.1 is IPv4-mapped IPv6 for 10.0.0.1 — private address.
+        // Previously slipped through because bytes.Length != 4 short-circuited to false.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = JsonContent.Create(new { targetUrl = "http://[::ffff:10.0.0.1]/secret" });
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     // --- [FromHeader] binding (#8: SliceAotArgumentBinder header-bind path) ---
 
     [Fact]
@@ -228,6 +260,7 @@ public sealed class LinkTests : IAsyncLifetime
         using var doc = JsonDocument.Parse(body);
         Assert.True(doc.RootElement.GetProperty("items").GetArrayLength() >= 2);
         Assert.Equal(1, doc.RootElement.GetProperty("page").GetInt32());
+        Assert.True(doc.RootElement.GetProperty("totalCount").GetInt32() >= 2);
     }
 
     [Fact]

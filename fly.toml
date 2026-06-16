@@ -23,6 +23,13 @@ primary_region = "nrt"
   size = "shared-cpu-1x"
   memory = "256mb"
 
+[[http_service.checks]]
+  method = "GET"
+  path = "/health/ready"
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "10s"
+
 [env]
   ASPNETCORE_URLS = "http://+:8080"
   # Set at deploy time (fly secrets set):

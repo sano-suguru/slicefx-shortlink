@@ -175,6 +175,21 @@
         "x-slicefx-portability": "portable"
       }
     },
+    "/health/ready": {
+      "get": {
+        "operationId": "Health.GetReady",
+        "summary": "Readiness probe — verifies DB is reachable",
+        "tags": [
+          "Health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "x-slicefx-portability": "portable"
+      }
+    },
     "/r/{code}": {
       "get": {
         "operationId": "Redirect.FollowLink",
@@ -368,12 +383,17 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "required": [
           "items",
           "page",
-          "pageSize"
+          "pageSize",
+          "totalCount"
         ]
       }
     }

@@ -79,6 +79,15 @@ public sealed class PostgresLinkStore(NpgsqlDataSource db) : ILinkStore
         return results;
     }
 
+    public async Task<int> CountByOwnerAsync(string ownerKeyHash, CancellationToken ct)
+    {
+        await using var conn = await db.OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM links WHERE owner_key_hash = $1";
+        cmd.Parameters.AddWithValue(ownerKeyHash);
+        return (int)(long)(await cmd.ExecuteScalarAsync(ct) ?? 0L);
+    }
+
     public async Task<bool> DeleteAsync(long id, string ownerKeyHash, CancellationToken ct)
     {
         await using var conn = await db.OpenConnectionAsync(ct);
