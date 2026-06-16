@@ -88,13 +88,13 @@ docker run --rm -p 8080:8080 \
 
 - **`ISliceFilter` with `ResponseHeaders` + `ClientIp`** — `RateLimitFilter` uses `context.ClientIp` as the per-client bucket key and writes `Retry-After`/`X-RateLimit-*` via `context.ResponseHeaders`. Works under NativeAOT, feature stays `portable`.
 - **`ISliceValidator<T>`** — auto-discovered, runs DataAnnotations→Slice-validator→filter in order, zero IL warnings, feature stays `portable`. See `CreateLinkRequestValidator.cs`.
-- **`[FromHeader]` in `Handle` signature** — `SliceAotArgumentBinder` correctly resolves header parameters (not confused with body binding, no SLICE023), feature stays `portable`. See `CreateLink.Handle` with `[FromHeader(Name="X-Request-Id")] string? requestId`.
+- **`[FromHeader]` in `Handle` signature** — `SliceAotArgumentBinder` correctly resolves header parameters (not confused with body binding, no SLICE070), feature stays `portable`. See `CreateLink.Handle` with `[FromHeader(Name="X-Request-Id")] string? requestId`.
 - **`SliceResult.Redirect`** under NativeAOT — `GET /r/{code}` returns 302 + `Location` correctly via the AOT emitter's `SliceResultKind.Redirect` path.
 - **Scoped DI write-back via `ISliceFilter`** — `ApiKeyAuthFilter` resolves the API key and writes to mutable scoped `CurrentApiKey`; handler reads it in the same request scope. Works correctly under NativeAOT.
 
 ### Authoring notes
 
-- **SLICE023 disambiguation**: Concrete class DI services in `Handle` parameters alongside a body `Request` trigger SLICE023. Fix: use interfaces for all DI services. `IConfiguration` is also problematic — wrap it in a user-defined settings interface (e.g. `IShortLinkSettings`).
+- **SLICE070 disambiguation**: This app uses `[assembly: SliceAspNetAot]`, so the ASP.NET registration path uses compile-time binding — the same heuristic as WASI/Lambda portable dispatch. A concrete type that is **registered in `[SliceJsonContext(AspNet)]` and appears on a body verb (POST/PUT/PATCH)** becomes a second body candidate alongside the request DTO and triggers **SLICE070 (Error)**. Concretely: `NpgsqlDataSource` is *not* in the JSON context, so it is always resolved from DI regardless of verb (no diagnostic). Types that *are* in the JSON context on a POST/PUT/PATCH handler need `[FromServices]` or an interface type to avoid SLICE070. Fix: use interfaces for all DI services — interface/abstract types are always resolved from DI on all paths. `IConfiguration` is also problematic — wrap it in a user-defined settings interface (e.g. `IShortLinkSettings`).
 
 ## Structure
 
