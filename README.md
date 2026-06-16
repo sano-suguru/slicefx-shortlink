@@ -10,7 +10,7 @@ Paired with [slicefx-inbox](https://github.com/sano-suguru/slicefx-inbox) which 
 |---|---|
 | SliceFx NativeAOT source-gen dispatch | `[assembly: SliceAspNetAot]` + distroless container smoke |
 | Scoped DI write-back via `ISliceFilter` | `ApiKeyAuthFilter` → `ICurrentApiKey` → handler |
-| ASP.NET-only `IEndpointFilter` with response headers | `RateLimitFilter` + `Retry-After` + `X-RateLimit-*` |
+| Host-neutral `ISliceFilter` (`ClientIp` + `ResponseHeaders`) | `RateLimitFilter` + `Retry-After` + `X-RateLimit-*` |
 | `SliceResult.Redirect` in NativeAOT | `GET /r/{code}` → 302 |
 | Raw Npgsql + NativeAOT trimming | `NpgsqlDataSourceBuilder`, no `EnableDynamicJson()` |
 | `ISliceValidator<T>` under NativeAOT | `CreateLinkRequestValidator` — scheme allowlist + best-effort host guard |
@@ -22,15 +22,15 @@ Paired with [slicefx-inbox](https://github.com/sano-suguru/slicefx-inbox) which 
 ## Portability snapshot
 
 ```
-Links.CreateLink    portable   POST  /api/links
-Links.ListLinks     portable   GET   /api/links
+Links.CreateLink    portable   POST   /api/links
+Links.ListLinks     portable   GET    /api/links
 Links.DeleteLink    portable   DELETE /api/links/{id}
-Links.GetLinkStats  portable   GET   /api/links/{id}/stats
-Health.GetHealth    portable   GET   /health
-Redirect.FollowLink partial    GET   /r/{code}   ← [Filter<RateLimitFilter>] is aspnet-only
+Links.GetLinkStats  portable   GET    /api/links/{id}/stats
+Health.GetHealth    portable   GET    /health
+Redirect.FollowLink portable   GET    /r/{code}
 ```
 
-`/r/{code}` is intentionally `partial` — rate-limiting requires `Retry-After` response headers, which `ISliceFilter` v1 cannot set post-handler. This is by design and serves as a framework pressure point.
+All 6 routes are `portable`. `/r/{code}` rate-limiting is implemented via `ISliceFilter` using `context.ClientIp` (per-client bucket key) and `context.ResponseHeaders` (`Retry-After`, `X-RateLimit-*`).
 
 ## Measured numbers (linux-x64, 2026-06-14)
 
@@ -80,29 +80,19 @@ docker run --rm -p 8080:8080 \
   shortlink-api
 ```
 
-## SliceFx framework findings
+## SliceFx coverage & authoring notes
 
-Issues found and reported while building this app:
+### Validated AOT paths
 
-1. **`docs/guides/aot-safe-scoped-di.md` had three bugs** (fixed in [slicefx commit 2564be8](https://github.com/sano-suguru/slicefx)):
-   - `InvokeAsync` documented as 3-arg; real interface is 2-arg
-   - `[Filter<T>]` shown on an `ISliceFilter` implementation; correct attribute is `[SliceFilter<T>]`
-   - `CurrentWorkspace` was immutable — the write-back pattern couldn't work
-
-2. **`ISliceFilter` v1 cannot set response headers post-handler**: Rate-limiting with `Retry-After` requires `IEndpointFilter`, which makes the endpoint `aspnet-only/partial`. Tracked in [slicefx#29](https://github.com/sano-suguru/slicefx/issues/29).
-
-3. **SLICE023 disambiguation**: Concrete class DI services in `Handle` parameters alongside a body `Request` trigger SLICE023. Fix: use interfaces for all DI services. `IConfiguration` is also problematic — wrap it in a user-defined settings interface.
-
-4. **`slicefx openapi` schema component names are order-dependent**: The first feature to register a nested `Request`/`Response` type claims the bare unqualified name; later features with same-named nested types get `Feature_Response`. Root cause in `GetComponentName` (`GenerateOpenApiCommand.cs:595-622`). Tracked in [slicefx#30](https://github.com/sano-suguru/slicefx/issues/30).
-
-5. **`slicefx client csharp` does not surface `Created` Location or `Redirect` target**: `UnwrapSliceResultType` projects by type shape only — `SliceResult<T>.Created(value, location)` generates `Task<T>` with the `Location` header silently dropped. Non-generic `SliceResult.Redirect(location)` generates `Task` (void). Confirmed reproduction: `CreateLinkAsync` returns `Task<CreateLink.Response>` with no way to read the short URL from the standard `Location` header. Tracked in [slicefx#31](https://github.com/sano-suguru/slicefx/issues/31).
-
-### Validated AOT paths (from this dogfooding)
-
-- **`ISliceValidator<T>`** works under NativeAOT — auto-discovered, runs DataAnnotations→Slice-validator→filter in order, zero IL warnings, feature stays `portable`. See `CreateLinkRequestValidator.cs`.
+- **`ISliceFilter` with `ResponseHeaders` + `ClientIp`** — `RateLimitFilter` uses `context.ClientIp` as the per-client bucket key and writes `Retry-After`/`X-RateLimit-*` via `context.ResponseHeaders`. Works under NativeAOT, feature stays `portable`.
+- **`ISliceValidator<T>`** — auto-discovered, runs DataAnnotations→Slice-validator→filter in order, zero IL warnings, feature stays `portable`. See `CreateLinkRequestValidator.cs`.
 - **`[FromHeader]` in `Handle` signature** — `SliceAotArgumentBinder` correctly resolves header parameters (not confused with body binding, no SLICE023), feature stays `portable`. See `CreateLink.Handle` with `[FromHeader(Name="X-Request-Id")] string? requestId`.
 - **`SliceResult.Redirect`** under NativeAOT — `GET /r/{code}` returns 302 + `Location` correctly via the AOT emitter's `SliceResultKind.Redirect` path.
 - **Scoped DI write-back via `ISliceFilter`** — `ApiKeyAuthFilter` resolves the API key and writes to mutable scoped `CurrentApiKey`; handler reads it in the same request scope. Works correctly under NativeAOT.
+
+### Authoring notes
+
+- **SLICE023 disambiguation**: Concrete class DI services in `Handle` parameters alongside a body `Request` trigger SLICE023. Fix: use interfaces for all DI services. `IConfiguration` is also problematic — wrap it in a user-defined settings interface (e.g. `IShortLinkSettings`).
 
 ## Structure
 
