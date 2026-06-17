@@ -15,11 +15,11 @@
 
   <!-- SliceFx packages (NuGet only — no ProjectReference to slicefx/) -->
   <ItemGroup>
-    <PackageReference Include="SliceFx.Core" Version="0.1.0-preview.15" />
-    <PackageReference Include="SliceFx.SourceGenerator" Version="0.1.0-preview.15"
+    <PackageReference Include="SliceFx.Core" />
+    <PackageReference Include="SliceFx.SourceGenerator"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
-    <PackageReference Include="Npgsql" Version="9.0.3" />
+    <PackageReference Include="Npgsql" />
   </ItemGroup>
 
   <ItemGroup>
