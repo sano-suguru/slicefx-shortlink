@@ -11,7 +11,7 @@ namespace ShortLink.Api.Filters;
 /// deployment this is the intended behaviour.
 /// </para>
 /// </summary>
-public sealed class RateLimitFilter : ISliceFilter
+public sealed class RateLimitFilter(TimeProvider time) : ISliceFilter
 {
     private const int Limit = 20;
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
@@ -51,13 +51,18 @@ public sealed class RateLimitFilter : ISliceFilter
         }
     }
 
-    /// <summary>Clears all rate-limit buckets. For use in tests only.</summary>
-    internal static void ResetForTests() => Buckets.Clear();
+    /// <summary>Clears all rate-limit buckets and resets the sweep gate. For use in tests only.</summary>
+    internal static void ResetForTests()
+    {
+        Buckets.Clear();
+        // Reset the sweep gate so that tests using different injected clocks don't pollute each other.
+        _nextSweep = DateTimeOffset.MinValue;
+    }
 
     public async ValueTask<SliceFilterResult> InvokeAsync(SliceFilterContext context, SliceFilterDelegate next)
     {
         var ip = context.ClientIp ?? "unknown";
-        var now = DateTimeOffset.UtcNow;
+        var now = time.GetUtcNow();
 
         SweepExpiredBuckets(now);
 

@@ -1,5 +1,6 @@
 using ShortLink.Api.Filters;
 using ShortLink.Api.Infrastructure;
+using ShortLink.Contracts;
 
 namespace ShortLink.Api.Features.Links;
 
@@ -7,10 +8,7 @@ namespace ShortLink.Api.Features.Links;
 [SliceFilter<ApiKeyAuthFilter>]
 public static class GetLinkStats
 {
-    public record Response(long Id, string Code, long TotalClicks, IReadOnlyList<DailyClicksItem> Daily);
-    public record DailyClicksItem(DateOnly Date, long Count);
-
-    public static async Task<SliceResult<Response>> Handle(
+    public static async Task<SliceResult<GetLinkStatsResponse>> Handle(
         long id,
         ICurrentApiKey key,
         ILinkStore links,
@@ -20,11 +18,11 @@ public static class GetLinkStats
         var link = await links.FindByIdAsync(id, ct);
         if (link is null || link.OwnerKeyHash != key.OwnerId)
         {
-            return SliceResult<Response>.NotFound();
+            return SliceResult<GetLinkStatsResponse>.NotFound();
         }
 
         var stats = await clicks.GetStatsAsync(id, ct);
         var daily = stats.Daily.Select(d => new DailyClicksItem(d.Date, d.Count)).ToList();
-        return SliceResult<Response>.Ok(new Response(link.Id, link.Code, stats.TotalClicks, daily));
+        return SliceResult<GetLinkStatsResponse>.Ok(new GetLinkStatsResponse(link.Id, link.Code, stats.TotalClicks, daily));
     }
 }

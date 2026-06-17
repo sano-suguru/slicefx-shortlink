@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ShortLink.Web": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5201"
+    }
+  }
+}

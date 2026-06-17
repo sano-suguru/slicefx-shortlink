@@ -1,10 +1,10 @@
+using ShortLink.Contracts;
+
 namespace ShortLink.Api.Features.Health;
 
 [Feature("GET /health", Summary = "Health check")]
 public static class GetHealth
 {
-    public record Response(string Status, DateTimeOffset At);
-
-    public static Task<Response> Handle(TimeProvider clock) =>
-        Task.FromResult(new Response("ok", clock.GetUtcNow()));
+    public static Task<GetHealthResponse> Handle(TimeProvider clock) =>
+        Task.FromResult(new GetHealthResponse("ok", clock.GetUtcNow()));
 }

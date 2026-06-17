@@ -1,16 +1,15 @@
 using System.Text.Json.Serialization;
-using ShortLink.Api.Features.Health;
-using ShortLink.Api.Features.Links;
+using ShortLink.Contracts;
 
 namespace ShortLink.Api;
 
 [SliceJsonContext(SliceJsonTarget.AspNet)]
-[JsonSerializable(typeof(GetHealth.Response), TypeInfoPropertyName = "GetHealthResponse")]
-[JsonSerializable(typeof(CreateLink.Request))]
-[JsonSerializable(typeof(CreateLink.Response), TypeInfoPropertyName = "CreateLinkResponse")]
-[JsonSerializable(typeof(ListLinks.Response), TypeInfoPropertyName = "ListLinksResponse")]
-[JsonSerializable(typeof(ListLinks.LinkItem))]
-[JsonSerializable(typeof(GetLinkStats.Response), TypeInfoPropertyName = "GetLinkStatsResponse")]
-[JsonSerializable(typeof(GetLinkStats.DailyClicksItem))]
+[JsonSerializable(typeof(GetHealthResponse))]
+[JsonSerializable(typeof(CreateLinkRequest))]
+[JsonSerializable(typeof(CreateLinkResponse), TypeInfoPropertyName = "CreateLinkResponse")]
+[JsonSerializable(typeof(ListLinksResponse), TypeInfoPropertyName = "ListLinksResponse")]
+[JsonSerializable(typeof(LinkItem))]
+[JsonSerializable(typeof(GetLinkStatsResponse), TypeInfoPropertyName = "GetLinkStatsResponse")]
+[JsonSerializable(typeof(DailyClicksItem))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 internal sealed partial class AotJsonContext : JsonSerializerContext { }

@@ -19,6 +19,13 @@ builder.Services.AddSingleton<IShortLinkSettings>(new ShortLinkSettings
         ?? throw new InvalidOperationException("BaseUrl is required. Set the BaseUrl environment variable."),
 });
 
+// CORS for the Blazor WASM admin UI (hosted separately on Fly.io).
+// AllowAnyHeader is required so X-Api-Key passes the CORS preflight.
+builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
+    .WithOrigins("http://localhost:5201", "https://slicefx-shortlink-web.fly.dev")
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
+
 var app = builder.Build();
 
 // Trust X-Forwarded-For from the single immediate upstream (Fly proxy).
@@ -33,6 +40,8 @@ var fwdOptions = new ForwardedHeadersOptions
 fwdOptions.KnownIPNetworks.Clear();
 fwdOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(fwdOptions);
+
+app.UseCors();
 
 var seedKey = app.Configuration["SeedApiKey"]
     ?? throw new InvalidOperationException("SeedApiKey is required. Set the SeedApiKey environment variable.");

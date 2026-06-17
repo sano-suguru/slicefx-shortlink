@@ -72,7 +72,7 @@ public partial class SliceApiClient
             _prepareRequest = prepareRequest;
         }
 
-        public async Task<ShortLink.Api.Features.Health.GetHealth.Response> GetHealthAsync(CancellationToken cancellationToken = default)
+        public async Task<ShortLink.Contracts.GetHealthResponse> GetHealthAsync(CancellationToken cancellationToken = default)
         {
             var __url = $"/health";
             using var __message = new HttpRequestMessage(HttpMethod.Get, __url);
@@ -113,7 +113,7 @@ public partial class SliceApiClient
             _prepareRequest = prepareRequest;
         }
 
-        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.CreateLink.Response>> CreateLinkAsync(ShortLink.Api.Features.Links.CreateLink.Request req, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Contracts.CreateLinkResponse>> CreateLinkAsync(ShortLink.Contracts.CreateLinkRequest req, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links";
             using var __message = new HttpRequestMessage(new HttpMethod("POST"), __url);
@@ -128,7 +128,7 @@ public partial class SliceApiClient
             var __location = __response.Headers.Location;
             var __body = await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.CreateLinkResponse, cancellationToken).ConfigureAwait(false)
                 ?? throw new HttpRequestException("Route 'Links.CreateLink' returned an empty response body.");
-            return new SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.CreateLink.Response>(__body, __statusCode, __location);
+            return new SliceApiClient.__SliceClientResponse<ShortLink.Contracts.CreateLinkResponse>(__body, __statusCode, __location);
         }
 
         public async Task<SliceApiClient.__SliceClientResponse> DeleteLinkAsync(long id, CancellationToken cancellationToken = default)
@@ -146,7 +146,7 @@ public partial class SliceApiClient
             return new SliceApiClient.__SliceClientResponse(__statusCode, __location);
         }
 
-        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.GetLinkStats.Response>> GetLinkStatsAsync(long id, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Contracts.GetLinkStatsResponse>> GetLinkStatsAsync(long id, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links/{SliceApiClient.FormatRouteValue(id)}/stats";
             using var __message = new HttpRequestMessage(HttpMethod.Get, __url);
@@ -160,10 +160,10 @@ public partial class SliceApiClient
             var __location = __response.Headers.Location;
             var __body = await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.GetLinkStatsResponse, cancellationToken).ConfigureAwait(false)
                 ?? throw new HttpRequestException("Route 'Links.GetLinkStats' returned an empty response body.");
-            return new SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.GetLinkStats.Response>(__body, __statusCode, __location);
+            return new SliceApiClient.__SliceClientResponse<ShortLink.Contracts.GetLinkStatsResponse>(__body, __statusCode, __location);
         }
 
-        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.ListLinks.Response>> ListLinksAsync(int? page, int? pageSize, CancellationToken cancellationToken = default)
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Contracts.ListLinksResponse>> ListLinksAsync(int? page, int? pageSize, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links";
             var __query = new List<string>();
@@ -183,7 +183,7 @@ public partial class SliceApiClient
             var __location = __response.Headers.Location;
             var __body = await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.ListLinksResponse, cancellationToken).ConfigureAwait(false)
                 ?? throw new HttpRequestException("Route 'Links.ListLinks' returned an empty response body.");
-            return new SliceApiClient.__SliceClientResponse<ShortLink.Api.Features.Links.ListLinks.Response>(__body, __statusCode, __location);
+            return new SliceApiClient.__SliceClientResponse<ShortLink.Contracts.ListLinksResponse>(__body, __statusCode, __location);
         }
     }
 
@@ -272,11 +272,11 @@ public partial class SliceApiClient
 }
 
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
-[JsonSerializable(typeof(ShortLink.Api.Features.Links.ListLinks.Response), TypeInfoPropertyName = "ListLinksResponse")]
-[JsonSerializable(typeof(ShortLink.Api.Features.Links.CreateLink.Request), TypeInfoPropertyName = "CreateLinkRequest")]
-[JsonSerializable(typeof(ShortLink.Api.Features.Links.CreateLink.Response), TypeInfoPropertyName = "CreateLinkResponse")]
-[JsonSerializable(typeof(ShortLink.Api.Features.Links.GetLinkStats.Response), TypeInfoPropertyName = "GetLinkStatsResponse")]
-[JsonSerializable(typeof(ShortLink.Api.Features.Health.GetHealth.Response), TypeInfoPropertyName = "GetHealthResponse")]
+[JsonSerializable(typeof(ShortLink.Contracts.ListLinksResponse))]
+[JsonSerializable(typeof(ShortLink.Contracts.CreateLinkRequest))]
+[JsonSerializable(typeof(ShortLink.Contracts.CreateLinkResponse))]
+[JsonSerializable(typeof(ShortLink.Contracts.GetLinkStatsResponse))]
+[JsonSerializable(typeof(ShortLink.Contracts.GetHealthResponse))]
 [JsonSerializable(typeof(SliceApiClient.SliceProblemDetails))]
 internal sealed partial class SliceApiClientJsonContext : JsonSerializerContext
 {

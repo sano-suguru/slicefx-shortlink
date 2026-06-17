@@ -20,19 +20,25 @@ internal static class TestDb
 
     public static NpgsqlDataSource Build() => Db.Build(ConnectionString);
 
+    // Bootstrap is called once per test process. Direct execution guarantees this
+    // because DisableTestParallelization = true in AssemblyInfo.cs.
+    private static bool _bootstrapped;
+
     public static async Task ClearLinksAsync(NpgsqlDataSource ds, CancellationToken ct = default)
     {
         // Reset in-process rate-limit state so tests are isolated from each other.
         // Tests run serially (DisableTestParallelization in AssemblyInfo.cs), so this is safe.
         RateLimitFilter.ResetForTests();
 
-        // Bootstrap schema before truncating so this works on a fresh database (e.g. CI service container).
-        // schema.sql uses CREATE TABLE IF NOT EXISTS and the seed insert uses ON CONFLICT DO NOTHING,
-        // so this call is idempotent when tables already exist.
-        await Db.BootstrapAsync(ds, SeedApiKey, ct);
-
-        // Ensure the second test key exists (idempotent via ON CONFLICT DO NOTHING).
-        await SeedSecondApiKeyAsync(ds, ct);
+        // Bootstrap schema exactly once per process. schema.sql uses CREATE TABLE IF NOT EXISTS
+        // and seed inserts use ON CONFLICT DO NOTHING, so it is idempotent on subsequent calls,
+        // but calling it hundreds of times is wasteful. The static bool guard avoids that.
+        if (!_bootstrapped)
+        {
+            await Db.BootstrapAsync(ds, SeedApiKey, ct);
+            await SeedSecondApiKeyAsync(ds, ct);
+            _bootstrapped = true;
+        }
 
         await using var conn = await ds.OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();

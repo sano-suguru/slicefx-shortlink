@@ -1,5 +1,6 @@
 extern alias ShortLinkApi;
 
+using Microsoft.Extensions.DependencyInjection;
 using SliceFx.Testing;
 
 namespace ShortLink.Api.Tests.Helpers;
@@ -21,4 +22,11 @@ internal static class TestHostFactory
 
     public static SliceTestHost<ShortLinkApi::Program> Create() =>
         SliceTestHost.Create<ShortLinkApi::Program>();
+
+    /// <summary>
+    /// Creates a test host with a custom DI configuration override.
+    /// Use to swap out services with test doubles (e.g. ThrowingClickStore).
+    /// </summary>
+    public static SliceTestHost<ShortLinkApi::Program> Create(Action<IServiceCollection> configure) =>
+        SliceTestHost.Create<ShortLinkApi::Program>(configure);
 }

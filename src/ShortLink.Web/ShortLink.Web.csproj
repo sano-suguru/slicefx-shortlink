@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <RootNamespace>ShortLink.Web</RootNamespace>
+    <!-- CS1591: XML doc comments not required -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Only ApiClient — pulls in Contracts transitively. Server (Npgsql) is never referenced. -->
+    <ProjectReference Include="..\ShortLink.ApiClient\ShortLink.ApiClient.csproj" />
+  </ItemGroup>
+
+</Project>

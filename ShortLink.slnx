@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ShortLink.Contracts/ShortLink.Contracts.csproj" />
     <Project Path="src/ShortLink.Api/ShortLink.Api.csproj" />
     <Project Path="src/ShortLink.ApiClient/ShortLink.ApiClient.csproj" />
+    <Project Path="src/ShortLink.Web/ShortLink.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ShortLink.Api.Tests/ShortLink.Api.Tests.csproj" />

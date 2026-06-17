@@ -1,0 +1,310 @@
+@page "/"
+@inject SliceApiClient ApiClient
+@inject ApiKeyProvider Keys
+@inject IJSRuntime JS
+@inject IConfiguration Config
+
+<main>
+    <h1>ShortLink Admin</h1>
+
+    @* ── API Key ── *@
+    <section class="card">
+        <h2>API Key</h2>
+        <p class="hint">
+            Key is stored in browser localStorage. This is a dogfooding convenience,
+            not a production security model.
+        </p>
+        <div class="field-row">
+            <input type="password" placeholder="Enter API key" @bind="_apiKeyInput" @bind:event="oninput" />
+            <button @onclick="SaveApiKeyAsync">Save</button>
+        </div>
+        @if (_apiKeySaved)
+        {
+            <p class="success-msg">Key saved.</p>
+        }
+    </section>
+
+    @* ── Create Link ── *@
+    <section class="card">
+        <h2>Create Short Link</h2>
+        <EditForm EditContext="_createEditContext" OnValidSubmit="CreateLinkAsync">
+            <DataAnnotationsValidator />
+            <div class="field">
+                <label for="targetUrl">Target URL</label>
+                <InputText id="targetUrl" @bind-Value="_createReq.TargetUrl" />
+                <ValidationMessage For="@(() => _createReq.TargetUrl)" />
+            </div>
+            <button type="submit" disabled="@_creating">@(_creating ? "Creating…" : "Create")</button>
+        </EditForm>
+        @if (_createError is not null)
+        {
+            <p class="error-msg">@_createError</p>
+        }
+        @if (_lastCreated is not null)
+        {
+            <div class="success-card">
+                <strong>Created!</strong>
+                Short URL: <a href="@_lastCreated.ShortUrl" target="_blank">@_lastCreated.ShortUrl</a>
+                (code: <code>@_lastCreated.Code</code>)
+            </div>
+        }
+    </section>
+
+    @* ── Link List ── *@
+    <section class="card">
+        <h2>My Links</h2>
+        <div class="toolbar">
+            <button @onclick="LoadLinksAsync" disabled="@_loadingLinks">@(_loadingLinks ? "Loading…" : "Refresh")</button>
+            <span class="pager">
+                Page
+                <button @onclick="PrevPage" disabled="@(_page <= 1 || _loadingLinks)">&laquo;</button>
+                @_page
+                <button @onclick="NextPage" disabled="@(_loadingLinks)">&raquo;</button>
+                | PageSize:
+                <select @bind="_pageSize" @bind:after="ReloadLinksAsync">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                </select>
+            </span>
+        </div>
+
+        @if (_listError is not null)
+        {
+            <p class="error-msg">@_listError</p>
+        }
+        else if (_links is not null)
+        {
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Code</th>
+                        <th>Short URL</th>
+                        <th>Target</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var link in _links.Items)
+                    {
+                        <tr>
+                            <td>@link.Id</td>
+                            <td><code>@link.Code</code></td>
+                            <td>
+                                @* Short URL links go directly to the API origin for the redirect *@
+                                <a href="@link.ShortUrl" target="_blank">@link.ShortUrl</a>
+                            </td>
+                            <td class="truncate" title="@link.TargetUrl">@link.TargetUrl</td>
+                            <td>@link.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="actions">
+                                <button @onclick="() => LoadStatsAsync(link.Id)">Stats</button>
+                                <button @onclick="() => DeleteLinkAsync(link.Id)" class="btn-danger">Delete</button>
+                            </td>
+                        </tr>
+                        @if (_statsLinkId == link.Id && _stats is not null)
+                        {
+                            <tr class="stats-row">
+                                <td colspan="6">
+                                    <strong>Total clicks:</strong> @_stats.TotalClicks
+                                    @if (_stats.Daily.Count > 0)
+                                    {
+                                        <table class="daily-table">
+                                            <thead><tr><th>Date</th><th>Clicks</th></tr></thead>
+                                            <tbody>
+                                                @foreach (var d in _stats.Daily)
+                                                {
+                                                    <tr><td>@d.Date.ToString("yyyy-MM-dd")</td><td>@d.Count</td></tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                    else
+                                    {
+                                        <span> (no clicks yet)</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            <p class="total">Total: @_links.TotalCount</p>
+        }
+    </section>
+</main>
+
+@code {
+    // ── API Key state ──
+    private string _apiKeyInput = "";
+    private bool _apiKeySaved;
+
+    // ── Create Link state ──
+    private CreateLinkRequest _createReq = new();
+    private EditContext _createEditContext = default!;
+    private ValidationMessageStore _createErrors = default!;
+    private bool _creating;
+    private string? _createError;
+    private CreateLinkResponse? _lastCreated;
+
+    // ── List state ──
+    private ListLinksResponse? _links;
+    private bool _loadingLinks;
+    private string? _listError;
+    private int _page = 1;
+    private int _pageSize = 20;
+
+    // ── Stats state ──
+    private long? _statsLinkId;
+    private GetLinkStatsResponse? _stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitCreateForm();
+        // Load persisted API key from localStorage.
+        var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "shortlink_api_key");
+        if (!string.IsNullOrWhiteSpace(stored))
+        {
+            Keys.Current = stored;
+            _apiKeyInput = stored;
+        }
+
+        await LoadLinksAsync();
+    }
+
+    private void InitCreateForm()
+    {
+        _createReq = new CreateLinkRequest();
+        _createEditContext = new EditContext(_createReq);
+        _createErrors = new ValidationMessageStore(_createEditContext);
+    }
+
+    // ── API Key ──
+
+    private async Task SaveApiKeyAsync()
+    {
+        Keys.Current = _apiKeyInput;
+        await JS.InvokeVoidAsync("localStorage.setItem", "shortlink_api_key", _apiKeyInput);
+        _apiKeySaved = true;
+        StateHasChanged();
+    }
+
+    // ── Create Link ──
+
+    private async Task CreateLinkAsync()
+    {
+        _creating = true;
+        _createError = null;
+        _lastCreated = null;
+        _createErrors.Clear();
+
+        try
+        {
+            var resp = await ApiClient.Links.CreateLinkAsync(_createReq);
+            _lastCreated = resp.Value;
+            InitCreateForm();
+            await LoadLinksAsync();
+        }
+        catch (SliceApiClient.SliceApiException ex) when (ex.Errors is not null)
+        {
+            // Map server-side Problem Details field errors into the EditForm's ValidationMessageStore.
+            // SliceFx emits Pascal-case property names (e.g. "TargetUrl") matching FieldIdentifier.FieldName.
+            foreach (var (field, messages) in ex.Errors)
+            {
+                var fi = new FieldIdentifier(_createReq, field);
+                foreach (var msg in messages)
+                    _createErrors.Add(fi, msg);
+            }
+            _createEditContext.NotifyValidationStateChanged();
+        }
+        catch (SliceApiClient.SliceApiException ex)
+        {
+            _createError = ex.Message;
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    // ── List ──
+
+    private async Task LoadLinksAsync()
+    {
+        _loadingLinks = true;
+        _listError = null;
+        try
+        {
+            var resp = await ApiClient.Links.ListLinksAsync(_page, _pageSize);
+            _links = resp.Value;
+        }
+        catch (SliceApiClient.SliceApiException ex)
+        {
+            _listError = ex.Message;
+        }
+        finally
+        {
+            _loadingLinks = false;
+        }
+    }
+
+    private async Task ReloadLinksAsync()
+    {
+        _page = 1;
+        await LoadLinksAsync();
+    }
+
+    private async Task PrevPage()
+    {
+        if (_page > 1) { _page--; await LoadLinksAsync(); }
+    }
+
+    private async Task NextPage()
+    {
+        _page++;
+        await LoadLinksAsync();
+    }
+
+    // ── Stats ──
+
+    private async Task LoadStatsAsync(long id)
+    {
+        if (_statsLinkId == id)
+        {
+            // Toggle off
+            _statsLinkId = null;
+            _stats = null;
+            return;
+        }
+
+        _statsLinkId = id;
+        _stats = null;
+        try
+        {
+            var resp = await ApiClient.Links.GetLinkStatsAsync(id);
+            _stats = resp.Value;
+        }
+        catch (SliceApiClient.SliceApiException ex)
+        {
+            _listError = $"Stats error: {ex.Message}";
+            _statsLinkId = null;
+        }
+    }
+
+    // ── Delete ──
+
+    private async Task DeleteLinkAsync(long id)
+    {
+        try
+        {
+            await ApiClient.Links.DeleteLinkAsync(id);
+            if (_statsLinkId == id) { _statsLinkId = null; _stats = null; }
+            await LoadLinksAsync();
+        }
+        catch (SliceApiClient.SliceApiException ex)
+        {
+            _listError = $"Delete error: {ex.Message}";
+        }
+    }
+}

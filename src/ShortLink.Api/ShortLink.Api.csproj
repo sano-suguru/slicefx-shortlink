@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ShortLink.Contracts\ShortLink.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Db\schema.sql" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
   </ItemGroup>
 

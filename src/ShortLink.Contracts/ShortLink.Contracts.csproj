@@ -5,10 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- No FrameworkReference — zero dependencies, usable from WASM -->
+    <!-- CS1591: XML doc comments not required -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ShortLink.Contracts\ShortLink.Contracts.csproj" />
-  </ItemGroup>
 
 </Project>

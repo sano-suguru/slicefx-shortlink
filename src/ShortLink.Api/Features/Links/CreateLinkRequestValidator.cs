@@ -1,8 +1,9 @@
 using System.Net;
+using ShortLink.Contracts;
 
 namespace ShortLink.Api.Features.Links;
 
-// Validates CreateLink.Request beyond DataAnnotations ([Required, Url]).
+// Validates CreateLinkRequest beyond DataAnnotations ([Required, Url]).
 //
 // Purpose: best-effort open-redirect / phishing-URL guard.
 // - scheme must be http or https
@@ -12,11 +13,11 @@ namespace ShortLink.Api.Features.Links;
 // — it never fetches the target URL server-side. DNS rebinding is not defended
 // against by string-level host checks. This validator's primary purpose is to
 // exercise the ISliceValidator<T> execution path under ASP.NET NativeAOT (#4).
-public sealed class CreateLinkRequestValidator : ISliceValidator<CreateLink.Request>
+public sealed class CreateLinkRequestValidator : ISliceValidator<CreateLinkRequest>
 {
     private static readonly string[] AllowedSchemes = ["http", "https"];
 
-    public ValueTask<SliceValidationResult> ValidateAsync(CreateLink.Request value, CancellationToken ct)
+    public ValueTask<SliceValidationResult> ValidateAsync(CreateLinkRequest value, CancellationToken ct)
     {
         if (!Uri.TryCreate(value.TargetUrl, UriKind.Absolute, out var uri))
         {

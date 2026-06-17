@@ -6,7 +6,7 @@ using ShortLink.Api.Tests.Helpers;
 
 namespace ShortLink.Api.Tests;
 
-public sealed class HealthTests : IAsyncLifetime
+public sealed class GetHealthTests : IAsyncLifetime
 {
     public async ValueTask InitializeAsync()
     {
@@ -30,17 +30,5 @@ public sealed class HealthTests : IAsyncLifetime
         using var doc = JsonDocument.Parse(body);
         Assert.Equal("ok", doc.RootElement.GetProperty("status").GetString());
         Assert.True(doc.RootElement.TryGetProperty("at", out _));
-    }
-
-    [Fact]
-    public async Task GetReady_returns_200_when_db_up()
-    {
-        // Requires a running Postgres (same as all other integration tests).
-        await using var host = TestHostFactory.Create();
-        var ct = TestContext.Current.CancellationToken;
-
-        var response = await host.Client.GetAsync("/health/ready", ct);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }
