@@ -289,7 +289,7 @@ public partial class SliceApiClient
     }
 }
 
-[JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
+[JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(ShortLink.Contracts.ListLinksResponse))]
 [JsonSerializable(typeof(ShortLink.Contracts.CreateLinkRequest))]
 [JsonSerializable(typeof(ShortLink.Contracts.CreateLinkResponse))]

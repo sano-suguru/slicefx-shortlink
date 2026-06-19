@@ -21,6 +21,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\ShortLink.Api\ShortLink.Api.csproj" Aliases="ShortLinkApi" />
+    <ProjectReference Include="..\..\src\ShortLink.ApiClient\ShortLink.ApiClient.csproj" />
     <ProjectReference Include="..\..\src\ShortLink.Contracts\ShortLink.Contracts.csproj" />
     <PackageReference Include="SliceFx.Core" />
     <PackageReference Include="SliceFx.TestHost" />
