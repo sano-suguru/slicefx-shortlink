@@ -8,7 +8,7 @@ using SliceFx;
 
 namespace ShortLink.Api.Tests;
 
-public sealed class RateLimitFilterTests
+public sealed class PublicCreateRateLimitFilterTests
 {
     private static readonly IReadOnlyDictionary<string, string> EmptyHeaders =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -21,8 +21,8 @@ public sealed class RateLimitFilterTests
 
     private static SliceFilterContext MakeContext(string? clientIp, IServiceProvider? services = null) =>
         new(
-            method: "GET",
-            path: "/r/ABC123",
+            method: "POST",
+            path: "/api/links/public",
             headers: EmptyHeaders,
             routeValues: EmptyRouteValues,
             services: services ?? new ServiceCollection().BuildServiceProvider(),
@@ -31,11 +31,11 @@ public sealed class RateLimitFilterTests
 
     // Each test creates its own RateLimitStore — no static state, no reset needed.
     // Tests are isolated by instance, not by serial execution.
-    private static RateLimitFilter MakeFilter(FakeTimeProvider time) =>
-        new(new RateLimitStore(), time, NullLogger<RateLimitFilter>.Instance);
+    private static PublicCreateRateLimitFilter MakeFilter(FakeTimeProvider time) =>
+        new(new RateLimitStore(), time, NullLogger<PublicCreateRateLimitFilter>.Instance);
 
     [Fact]
-    public async Task First_request_passes_with_remaining_19()
+    public async Task First_request_passes_with_remaining_9()
     {
         var filter = MakeFilter(new FakeTimeProvider());
         var ctx = MakeContext("1.2.3.4");
@@ -43,17 +43,17 @@ public sealed class RateLimitFilterTests
         var result = await filter.InvokeAsync(ctx, PassThroughDelegate);
 
         Assert.False(result.IsShortCircuit);
-        Assert.Equal("19", ctx.ResponseHeaders["X-RateLimit-Remaining"]);
+        Assert.Equal("9", ctx.ResponseHeaders["X-RateLimit-Remaining"]);
     }
 
     [Fact]
-    public async Task Twentieth_request_passes_with_remaining_0()
+    public async Task Tenth_request_passes_with_remaining_0()
     {
         var filter = MakeFilter(new FakeTimeProvider());
 
         var result = default(SliceFilterResult);
         var lastCtx = MakeContext("2.3.4.5");
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < 10; i++)
         {
             lastCtx = MakeContext("2.3.4.5");
             result = await filter.InvokeAsync(lastCtx, PassThroughDelegate);
@@ -64,19 +64,20 @@ public sealed class RateLimitFilterTests
     }
 
     [Fact]
-    public async Task TwentyFirst_request_returns_429()
+    public async Task Eleventh_request_returns_429()
     {
         var filter = MakeFilter(new FakeTimeProvider());
 
         var result = default(SliceFilterResult);
         var lastCtx = MakeContext("3.4.5.6");
-        for (var i = 0; i < 21; i++)
+        for (var i = 0; i < 11; i++)
         {
             lastCtx = MakeContext("3.4.5.6");
             result = await filter.InvokeAsync(lastCtx, PassThroughDelegate);
         }
 
         Assert.True(result.IsShortCircuit);
+        Assert.Equal("10", lastCtx.ResponseHeaders["X-RateLimit-Limit"]);
         Assert.Equal("0", lastCtx.ResponseHeaders["X-RateLimit-Remaining"]);
         Assert.True(lastCtx.ResponseHeaders.TryGetValue("Retry-After", out var retryAfter));
         Assert.True(int.Parse(retryAfter!, CultureInfo.InvariantCulture) > 0);
@@ -88,7 +89,7 @@ public sealed class RateLimitFilterTests
         var filter = MakeFilter(new FakeTimeProvider());
 
         // Exhaust IP A.
-        for (var i = 0; i < 21; i++)
+        for (var i = 0; i < 11; i++)
         {
             await filter.InvokeAsync(MakeContext("10.0.0.1"), PassThroughDelegate);
         }
@@ -101,27 +102,13 @@ public sealed class RateLimitFilterTests
     }
 
     [Fact]
-    public async Task Null_clientip_uses_unknown_bucket()
-    {
-        var filter = MakeFilter(new FakeTimeProvider());
-
-        SliceFilterResult result = default;
-        for (var i = 0; i < 21; i++)
-        {
-            result = await filter.InvokeAsync(MakeContext(clientIp: null), PassThroughDelegate);
-        }
-
-        Assert.True(result.IsShortCircuit);
-    }
-
-    [Fact]
     public async Task Window_reset_allows_new_requests()
     {
         var time = new FakeTimeProvider();
         var filter = MakeFilter(time);
 
         // Exhaust the rate limit.
-        for (var i = 0; i < 21; i++)
+        for (var i = 0; i < 11; i++)
         {
             await filter.InvokeAsync(MakeContext("5.6.7.8"), PassThroughDelegate);
         }

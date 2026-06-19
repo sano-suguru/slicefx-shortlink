@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.HttpOverrides;
+using ShortLink.Api.Filters;
 using ShortLink.Api.Infrastructure;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
 builder.Services.AddSlice();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IRateLimitStore, RateLimitStore>();
 
 var connStr = Db.ResolveConnectionString(builder.Configuration);
 var dataSource = Db.Build(connStr);

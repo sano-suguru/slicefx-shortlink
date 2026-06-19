@@ -1,6 +1,5 @@
 extern alias ShortLinkApi;
 
-using ShortLinkApi::ShortLink.Api.Filters;
 using ShortLinkApi::ShortLink.Api.Infrastructure;
 
 namespace ShortLink.Api.Tests.Helpers;
@@ -26,9 +25,9 @@ internal static class TestDb
 
     public static async Task ClearLinksAsync(NpgsqlDataSource ds, CancellationToken ct = default)
     {
-        // Reset in-process rate-limit state so tests are isolated from each other.
-        // Tests run serially (DisableTestParallelization in AssemblyInfo.cs), so this is safe.
-        RateLimitFilter.ResetForTests();
+        // Rate-limit state is isolated via RateLimitStore (singleton), which is scoped to each
+        // host instance. Every TestHostFactory.Create() call creates a fresh WebApplicationFactory
+        // with its own DI container and therefore its own RateLimitStore — no manual reset needed.
 
         // Bootstrap schema exactly once per process. schema.sql uses CREATE TABLE IF NOT EXISTS
         // and seed inserts use ON CONFLICT DO NOTHING, so it is idempotent on subsequent calls,

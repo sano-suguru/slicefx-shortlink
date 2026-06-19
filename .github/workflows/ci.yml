@@ -64,6 +64,7 @@ jobs:
           routes = json.load(sys.stdin)
           expected = {
             'Links.CreateLink': 'portable',
+            'Links.CreatePublicLink': 'portable',
             'Links.ListLinks': 'portable',
             'Links.DeleteLink': 'portable',
             'Links.GetLinkStats': 'portable',

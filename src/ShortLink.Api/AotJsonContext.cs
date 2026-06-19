@@ -7,6 +7,7 @@ namespace ShortLink.Api;
 [JsonSerializable(typeof(GetHealthResponse))]
 [JsonSerializable(typeof(CreateLinkRequest))]
 [JsonSerializable(typeof(CreateLinkResponse), TypeInfoPropertyName = "CreateLinkResponse")]
+[JsonSerializable(typeof(CreatePublicLinkResponse), TypeInfoPropertyName = "CreatePublicLinkResponse")]
 [JsonSerializable(typeof(ListLinksResponse), TypeInfoPropertyName = "ListLinksResponse")]
 [JsonSerializable(typeof(LinkItem))]
 [JsonSerializable(typeof(GetLinkStatsResponse), TypeInfoPropertyName = "GetLinkStatsResponse")]

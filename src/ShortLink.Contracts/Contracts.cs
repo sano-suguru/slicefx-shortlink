@@ -25,6 +25,14 @@ public record CreateLinkResponse(
     DateTimeOffset CreatedAt,
     string? RequestId = null);
 
+/// <summary>Response returned when a short link is created anonymously via the public endpoint.</summary>
+public record CreatePublicLinkResponse(
+    long Id,
+    string Code,
+    string ShortUrl,
+    string TargetUrl,
+    DateTimeOffset CreatedAt);
+
 // ListLinks
 public record ListLinksResponse(
     IReadOnlyList<LinkItem> Items,

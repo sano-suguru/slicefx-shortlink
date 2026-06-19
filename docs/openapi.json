@@ -45,7 +45,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListLinks_Response"
+                  "$ref": "#/components/schemas/Contracts_ListLinksResponse"
                 }
               }
             }
@@ -74,7 +74,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateLink_Request"
+                "$ref": "#/components/schemas/Contracts_CreateLinkRequest"
               }
             }
           }
@@ -85,7 +85,39 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateLink_Response"
+                  "$ref": "#/components/schemas/Contracts_CreateLinkResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-slicefx-portability": "portable"
+      }
+    },
+    "/api/links/public": {
+      "post": {
+        "operationId": "Links.CreatePublicLink",
+        "summary": "Create a short link anonymously",
+        "tags": [
+          "Links"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Contracts_CreateLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contracts_CreatePublicLinkResponse"
                 }
               }
             }
@@ -144,7 +176,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetLinkStats_Response"
+                  "$ref": "#/components/schemas/Contracts_GetLinkStatsResponse"
                 }
               }
             }
@@ -166,7 +198,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GetHealth_Response"
+                  "$ref": "#/components/schemas/Contracts_GetHealthResponse"
                 }
               }
             }
@@ -234,7 +266,7 @@
   },
   "components": {
     "schemas": {
-      "CreateLink_Request": {
+      "Contracts_CreateLinkRequest": {
         "type": "object",
         "properties": {
           "targetUrl": {
@@ -245,7 +277,7 @@
           "targetUrl"
         ]
       },
-      "CreateLink_Response": {
+      "Contracts_CreateLinkResponse": {
         "type": "object",
         "properties": {
           "code": {
@@ -277,68 +309,7 @@
           "targetUrl"
         ]
       },
-      "GetHealth_Response": {
-        "type": "object",
-        "properties": {
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "status": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "at",
-          "status"
-        ]
-      },
-      "GetLinkStats_DailyClicksItem": {
-        "type": "object",
-        "properties": {
-          "count": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          }
-        },
-        "required": [
-          "count",
-          "date"
-        ]
-      },
-      "GetLinkStats_Response": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "daily": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GetLinkStats_DailyClicksItem"
-            }
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalClicks": {
-            "type": "integer",
-            "format": "int64"
-          }
-        },
-        "required": [
-          "code",
-          "daily",
-          "id",
-          "totalClicks"
-        ]
-      },
-      "ListLinks_LinkItem": {
+      "Contracts_CreatePublicLinkResponse": {
         "type": "object",
         "properties": {
           "code": {
@@ -367,13 +338,103 @@
           "targetUrl"
         ]
       },
-      "ListLinks_Response": {
+      "Contracts_DailyClicksItem": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "count",
+          "date"
+        ]
+      },
+      "Contracts_GetHealthResponse": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "status"
+        ]
+      },
+      "Contracts_GetLinkStatsResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contracts_DailyClicksItem"
+            }
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalClicks": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "code",
+          "daily",
+          "id",
+          "totalClicks"
+        ]
+      },
+      "Contracts_LinkItem": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "shortUrl": {
+            "type": "string"
+          },
+          "targetUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "createdAt",
+          "id",
+          "shortUrl",
+          "targetUrl"
+        ]
+      },
+      "Contracts_ListLinksResponse": {
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ListLinks_LinkItem"
+              "$ref": "#/components/schemas/Contracts_LinkItem"
             }
           },
           "page": {

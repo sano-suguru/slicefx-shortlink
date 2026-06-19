@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using ShortLink.Api.Tests.Helpers;
+using ShortLinkApi::ShortLink.Api.Infrastructure;
 
 namespace ShortLink.Api.Tests;
 
@@ -114,6 +115,29 @@ public sealed class ListLinksTests : IAsyncLifetime
         var items2 = doc2.RootElement.GetProperty("items").EnumerateArray().ToList();
         Assert.All(items2, item =>
             Assert.Contains("owner2.example.com", item.GetProperty("targetUrl").GetString()!));
+    }
+
+    [Fact]
+    public async Task ListLinks_excludes_anonymously_created_links()
+    {
+        // A link created anonymously (owner_key_hash = AnonymousOwner.KeyHash) must never
+        // surface in a real owner's listing — the sentinel owner is isolated like any other owner.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var store = new PostgresLinkStore(_ds!);
+        await store.CreateAsync("https://anon.example.com/secret", AnonymousOwner.KeyHash, ShortCode.Generate(), ct);
+
+        var listReq = new HttpRequestMessage(HttpMethod.Get, "/api/links");
+        listReq.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        var listResp = await host.Client.SendAsync(listReq, ct);
+
+        Assert.Equal(HttpStatusCode.OK, listResp.StatusCode);
+        var body = await listResp.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(body);
+        var items = doc.RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.DoesNotContain(items, item =>
+            item.GetProperty("targetUrl").GetString() == "https://anon.example.com/secret");
     }
 
     [Fact]

@@ -11,9 +11,11 @@ Paired with [slicefx-inbox](https://github.com/sano-suguru/slicefx-inbox) which 
 | SliceFx NativeAOT source-gen dispatch | `[assembly: SliceAspNetAot]` + distroless container smoke |
 | Scoped DI write-back via `ISliceFilter` | `ApiKeyAuthFilter` → `ICurrentApiKey` → handler |
 | Host-neutral `ISliceFilter` (`ClientIp` + `ResponseHeaders`) | `RateLimitFilter` + `Retry-After` + `X-RateLimit-*` |
+| Unauthenticated public feature + 2nd `ISliceFilter` rate limiter | `POST /api/links/public` → `PublicCreateRateLimitFilter` (10/min, shared singleton `RateLimitStore` / `"public-create"` partition) |
+| Sentinel owner (no schema migration) | `AnonymousOwner.KeyHash = "anonymous"` — non-hex, never collides with SHA-256 owner hashes |
 | `SliceResult.Redirect` in NativeAOT | `GET /r/{code}` → 302 |
 | Raw Npgsql + NativeAOT trimming | `NpgsqlDataSourceBuilder`, no `EnableDynamicJson()` |
-| `ISliceValidator<T>` under NativeAOT | `CreateLinkRequestValidator` — scheme allowlist + best-effort host guard |
+| `ISliceValidator<T>` under NativeAOT | `CreateLinkRequestValidator` auto-applies to both authed + public create (keyed on `CreateLinkRequest`) |
 | `[FromHeader]` binding in `Handle` | `CreateLink` echoes `X-Request-Id` header via `SliceAotArgumentBinder` |
 | Portability snapshot CI assertion | `slicefx routes --format json` checked per push |
 | Typed client compilation | `slicefx client csharp` → `SliceApiClient.g.cs` |
@@ -23,16 +25,17 @@ Paired with [slicefx-inbox](https://github.com/sano-suguru/slicefx-inbox) which 
 ## Portability snapshot
 
 ```
-Links.CreateLink    portable   POST   /api/links
-Links.ListLinks     portable   GET    /api/links
-Links.DeleteLink    portable   DELETE /api/links/{id}
-Links.GetLinkStats  portable   GET    /api/links/{id}/stats
-Health.GetHealth    portable   GET    /health
-Health.GetReady     portable   GET    /health/ready
-Redirect.FollowLink portable   GET    /r/{code}
+Links.CreateLink       portable   POST   /api/links
+Links.CreatePublicLink portable   POST   /api/links/public
+Links.ListLinks        portable   GET    /api/links
+Links.DeleteLink       portable   DELETE /api/links/{id}
+Links.GetLinkStats     portable   GET    /api/links/{id}/stats
+Health.GetHealth       portable   GET    /health
+Health.GetReady        portable   GET    /health/ready
+Redirect.FollowLink    portable   GET    /r/{code}
 ```
 
-All 7 routes are `portable`. `/r/{code}` rate-limiting is implemented via `ISliceFilter` using `context.ClientIp` (per-client bucket key) and `context.ResponseHeaders` (`Retry-After`, `X-RateLimit-*`).
+All 8 routes are `portable`. Rate-limiting is implemented via `ISliceFilter` using `context.ClientIp` as the per-client bucket key and `context.ResponseHeaders` for `Retry-After`/`X-RateLimit-*`: `RateLimitFilter` (20/min) guards `/r/{code}`; `PublicCreateRateLimitFilter` (10/min) guards `POST /api/links/public`.
 
 ## Measured numbers (linux-x64, 2026-06-14)
 

@@ -6,6 +6,12 @@ public sealed class PostgresLinkStore(NpgsqlDataSource db) : ILinkStore
 {
     private const int MaxRetries = 5;
 
+    // Anonymous links use AnonymousOwner.KeyHash ("anonymous") as the owner_key_hash sentinel.
+    // Because ApiKeyValidator.Hash always produces 64 lowercase hex characters, "anonymous" can
+    // never collide with a real owner hash. ListByOwnerAsync, CountByOwnerAsync, and DeleteAsync
+    // all filter by owner_key_hash, so anonymous links are naturally isolated from authenticated
+    // owners — no special-casing is required in the query layer.
+
     public async Task<LinkRecord> CreateAsync(string targetUrl, string ownerKeyHash, string code, CancellationToken ct)
     {
         for (var attempt = 0; attempt < MaxRetries; attempt++)

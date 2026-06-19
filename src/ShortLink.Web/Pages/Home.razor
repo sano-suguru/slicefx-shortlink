@@ -1,0 +1,90 @@
+@page "/"
+@inject SliceApiClient ApiClient
+@inject IJSRuntime JS
+
+<div class="hero">
+    <h1>Shorten a link</h1>
+    <p>Paste a URL and get a short link instantly. No account required.</p>
+
+    <EditForm class="hero-form" EditContext="_editContext" OnValidSubmit="ShortenAsync">
+        <DataAnnotationsValidator />
+        <InputText placeholder="https://example.com/very/long/url" @bind-Value="_req.TargetUrl" />
+        <button type="submit" disabled="@_creating">@(_creating ? "Shortening…" : "Shorten")</button>
+    </EditForm>
+
+    <ValidationMessage For="@(() => _req.TargetUrl)" />
+
+    @if (_error is not null)
+    {
+        <p class="error-msg">@_error</p>
+    }
+
+    @if (_shortUrl is not null)
+    {
+        <div class="result-card">
+            <div class="result-url">@_shortUrl</div>
+            <button class="copy-btn" @onclick="CopyAsync">@(_copied ? "Copied!" : "Copy")</button>
+        </div>
+    }
+</div>
+
+@code {
+    private CreateLinkRequest _req = new();
+    private EditContext _editContext = default!;
+    private ValidationMessageStore _errors = default!;
+    private bool _creating;
+    private string? _error;
+    private string? _shortUrl;
+    private bool _copied;
+
+    protected override void OnInitialized() => InitForm();
+
+    private void InitForm()
+    {
+        _req = new CreateLinkRequest();
+        _editContext = new EditContext(_req);
+        _errors = new ValidationMessageStore(_editContext);
+    }
+
+    private async Task ShortenAsync()
+    {
+        _creating = true;
+        _error = null;
+        _shortUrl = null;
+        _copied = false;
+        _errors.Clear();
+
+        try
+        {
+            var result = await ApiClient.Links.CreatePublicLinkAsync(_req);
+            _shortUrl = result.Value.ShortUrl;
+            InitForm();
+        }
+        catch (SliceApiClient.SliceApiException ex) when (ex.Errors is not null)
+        {
+            // Map server-side Problem Details field errors into the EditForm's ValidationMessageStore.
+            ex.Errors.ApplyTo(_req, _errors, _editContext);
+        }
+        catch (SliceApiClient.SliceApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            // The server sends a Retry-After header, but the generated client does not expose
+            // response headers on SliceApiException, so we cannot show an exact countdown.
+            _error = "リクエストが多すぎます。1分ほど待ってから再試行してください。";
+        }
+        catch (SliceApiClient.SliceApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        if (_shortUrl is null) return;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _shortUrl);
+        _copied = true;
+    }
+}

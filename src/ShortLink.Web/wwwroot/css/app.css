@@ -75,3 +75,79 @@ th { background: #f9f9f9; font-weight: 600; }
 .daily-table th, .daily-table td { padding: 0.25rem 0.5rem; }
 
 .alert { color: #c00; padding: 1rem; }
+
+/* Public hero page */
+.hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    gap: 1.5rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+.hero p {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.hero-form {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 600px;
+}
+
+.hero-form input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.result-card {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    padding: 1.5rem;
+    max-width: 600px;
+    width: 100%;
+}
+
+.result-url {
+    font-size: 1.25rem;
+    font-weight: 600;
+    word-break: break-all;
+    color: #166534;
+}
+
+.copy-btn {
+    margin-top: 0.75rem;
+}
+
+/* Top nav */
+.main-nav {
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.main-nav a {
+    text-decoration: none;
+    color: #374151;
+    font-weight: 500;
+}
+
+.main-nav a.active {
+    color: #1d4ed8;
+    text-decoration: underline;
+}

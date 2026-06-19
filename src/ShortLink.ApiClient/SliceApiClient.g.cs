@@ -131,6 +131,24 @@ public partial class SliceApiClient
             return new SliceApiClient.__SliceClientResponse<ShortLink.Contracts.CreateLinkResponse>(__body, __statusCode, __location);
         }
 
+        public async Task<SliceApiClient.__SliceClientResponse<ShortLink.Contracts.CreatePublicLinkResponse>> CreatePublicLinkAsync(ShortLink.Contracts.CreateLinkRequest req, CancellationToken cancellationToken = default)
+        {
+            var __url = $"/api/links/public";
+            using var __message = new HttpRequestMessage(new HttpMethod("POST"), __url);
+            __message.Content = JsonContent.Create(req, SliceApiClientJsonContext.Default.CreateLinkRequest);
+            _prepareRequest(__message);
+            using var __response = await _http.SendAsync(__message, cancellationToken).ConfigureAwait(false);
+            if (!__response.IsSuccessStatusCode)
+            {
+                await SliceApiClient.__ThrowApiException(__response, "CreatePublicLink", cancellationToken).ConfigureAwait(false);
+            }
+            var __statusCode = (int)__response.StatusCode;
+            var __location = __response.Headers.Location;
+            var __body = await __response.Content.ReadFromJsonAsync(SliceApiClientJsonContext.Default.CreatePublicLinkResponse, cancellationToken).ConfigureAwait(false)
+                ?? throw new HttpRequestException("Route 'Links.CreatePublicLink' returned an empty response body.");
+            return new SliceApiClient.__SliceClientResponse<ShortLink.Contracts.CreatePublicLinkResponse>(__body, __statusCode, __location);
+        }
+
         public async Task<SliceApiClient.__SliceClientResponse> DeleteLinkAsync(long id, CancellationToken cancellationToken = default)
         {
             var __url = $"/api/links/{SliceApiClient.FormatRouteValue(id)}";
@@ -275,6 +293,7 @@ public partial class SliceApiClient
 [JsonSerializable(typeof(ShortLink.Contracts.ListLinksResponse))]
 [JsonSerializable(typeof(ShortLink.Contracts.CreateLinkRequest))]
 [JsonSerializable(typeof(ShortLink.Contracts.CreateLinkResponse))]
+[JsonSerializable(typeof(ShortLink.Contracts.CreatePublicLinkResponse))]
 [JsonSerializable(typeof(ShortLink.Contracts.GetLinkStatsResponse))]
 [JsonSerializable(typeof(ShortLink.Contracts.GetHealthResponse))]
 [JsonSerializable(typeof(SliceApiClient.SliceProblemDetails))]
