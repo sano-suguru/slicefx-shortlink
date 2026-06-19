@@ -2,17 +2,19 @@
 @inject SliceApiClient ApiClient
 @inject IJSRuntime JS
 
-<div class="hero">
-    <h1>Shorten a link</h1>
-    <p>Paste a URL and get a short link instantly. No account required.</p>
+<section class="hero">
+    <p class="eyebrow">Free · No account required</p>
+    <h1>Make it short.</h1>
+    <p class="lead">Paste any URL. Get a link you can actually send.</p>
 
     <EditForm class="hero-form" EditContext="_editContext" OnValidSubmit="ShortenAsync">
         <DataAnnotationsValidator />
-        <InputText placeholder="https://example.com/very/long/url" @bind-Value="_req.TargetUrl" />
-        <button type="submit" disabled="@_creating">@(_creating ? "Shortening…" : "Shorten")</button>
+        <div class="hero-input-wrap">
+            <InputText placeholder="https://example.com/very/long/url" @bind-Value="_req.TargetUrl" />
+            <ValidationMessage For="@(() => _req.TargetUrl)" />
+        </div>
+        <button type="submit" class="btn-primary" disabled="@_creating">@(_creating ? "Shortening…" : "Shorten →")</button>
     </EditForm>
-
-    <ValidationMessage For="@(() => _req.TargetUrl)" />
 
     @if (_error is not null)
     {
@@ -22,11 +24,11 @@
     @if (_shortUrl is not null)
     {
         <div class="result-card">
-            <div class="result-url">@_shortUrl</div>
-            <button class="copy-btn" @onclick="CopyAsync">@(_copied ? "Copied!" : "Copy")</button>
+            <div class="result-url stamp">@_shortUrl</div>
+            <button class="copy-btn" @onclick="CopyAsync">@(_copied ? "Copied!" : "Copy link")</button>
         </div>
     }
-</div>
+</section>
 
 @code {
     private CreateLinkRequest _req = new();
@@ -69,7 +71,7 @@
         {
             // The server sends a Retry-After header, but the generated client does not expose
             // response headers on SliceApiException, so we cannot show an exact countdown.
-            _error = "リクエストが多すぎます。1分ほど待ってから再試行してください。";
+            _error = "Too many requests. Wait about a minute and try again.";
         }
         catch (SliceApiClient.SliceApiException ex)
         {

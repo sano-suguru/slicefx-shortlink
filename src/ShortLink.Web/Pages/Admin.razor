@@ -4,10 +4,10 @@
 @inject IJSRuntime JS
 @inject IConfiguration Config
 
-<h1>ShortLink Admin</h1>
+<h1>Admin</h1>
 
 @* ── API Key ── *@
-<section class="card">
+<section class="panel">
     <h2>API Key</h2>
     <p class="hint">
         Key is stored in browser localStorage. This is a dogfooding convenience,
@@ -24,7 +24,7 @@
 </section>
 
 @* ── Create Link ── *@
-<section class="card">
+<section class="panel">
     <h2>Create Short Link</h2>
     <EditForm EditContext="_createEditContext" OnValidSubmit="CreateLinkAsync">
         <DataAnnotationsValidator />
@@ -41,7 +41,7 @@
     }
     @if (_lastCreated is not null)
     {
-        <div class="success-card">
+        <div class="success-banner">
             <strong>Created!</strong>
             Short URL: <a href="@_lastCreated.ShortUrl" target="_blank">@_lastCreated.ShortUrl</a>
             (code: <code>@_lastCreated.Code</code>)
@@ -50,7 +50,7 @@
 </section>
 
 @* ── Link List ── *@
-<section class="card">
+<section class="panel">
     <h2>My Links</h2>
     <div class="toolbar">
         <button @onclick="LoadLinksAsync" disabled="@_loadingLinks">@(_loadingLinks ? "Loading…" : "Refresh")</button>
@@ -74,61 +74,63 @@
     }
     else if (_links is not null)
     {
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Code</th>
-                    <th>Short URL</th>
-                    <th>Target</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var link in _links.Items)
-                {
+        <div class="table-wrap">
+            <table>
+                <thead>
                     <tr>
-                        <td>@link.Id</td>
-                        <td><code>@link.Code</code></td>
-                        <td>
-                            @* Short URL links go directly to the API origin for the redirect *@
-                            <a href="@link.ShortUrl" target="_blank">@link.ShortUrl</a>
-                        </td>
-                        <td class="truncate" title="@link.TargetUrl">@link.TargetUrl</td>
-                        <td>@link.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
-                        <td class="actions">
-                            <button @onclick="() => LoadStatsAsync(link.Id)">Stats</button>
-                            <button @onclick="() => DeleteLinkAsync(link.Id)" class="btn-danger">Delete</button>
-                        </td>
+                        <th>ID</th>
+                        <th>Code</th>
+                        <th>Short URL</th>
+                        <th>Target</th>
+                        <th>Created</th>
+                        <th>Actions</th>
                     </tr>
-                    @if (_statsLinkId == link.Id && _stats is not null)
+                </thead>
+                <tbody>
+                    @foreach (var link in _links.Items)
                     {
-                        <tr class="stats-row">
-                            <td colspan="6">
-                                <strong>Total clicks:</strong> @_stats.TotalClicks
-                                @if (_stats.Daily.Count > 0)
-                                {
-                                    <table class="daily-table">
-                                        <thead><tr><th>Date</th><th>Clicks</th></tr></thead>
-                                        <tbody>
-                                            @foreach (var d in _stats.Daily)
-                                            {
-                                                <tr><td>@d.Date.ToString("yyyy-MM-dd")</td><td>@d.Count</td></tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                }
-                                else
-                                {
-                                    <span> (no clicks yet)</span>
-                                }
+                        <tr>
+                            <td class="mono">@link.Id</td>
+                            <td><code>@link.Code</code></td>
+                            <td>
+                                @* Short URL links go directly to the API origin for the redirect *@
+                                <a href="@link.ShortUrl" target="_blank">@link.ShortUrl</a>
+                            </td>
+                            <td class="truncate" title="@link.TargetUrl">@link.TargetUrl</td>
+                            <td class="mono">@link.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="actions">
+                                <button class="btn-text" @onclick="() => LoadStatsAsync(link.Id)">Stats</button>
+                                <button @onclick="() => DeleteLinkAsync(link.Id)" class="btn-danger">Delete</button>
                             </td>
                         </tr>
+                        @if (_statsLinkId == link.Id && _stats is not null)
+                        {
+                            <tr class="stats-row">
+                                <td colspan="6">
+                                    <strong>Total clicks:</strong> @_stats.TotalClicks
+                                    @if (_stats.Daily.Count > 0)
+                                    {
+                                        <table class="daily-table">
+                                            <thead><tr><th>Date</th><th>Clicks</th></tr></thead>
+                                            <tbody>
+                                                @foreach (var d in _stats.Daily)
+                                                {
+                                                    <tr><td class="mono">@d.Date.ToString("yyyy-MM-dd")</td><td>@d.Count</td></tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    }
+                                    else
+                                    {
+                                        <span> (no clicks yet)</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
                     }
-                }
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
         <p class="total">Total: @_links.TotalCount</p>
     }
 </section>
