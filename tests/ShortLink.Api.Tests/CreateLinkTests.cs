@@ -2,8 +2,11 @@ extern alias ShortLinkApi;
 
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using ShortLink.Api.Tests.Helpers;
+using ShortLinkApi::ShortLink.Api.Infrastructure;
+using SliceFx.Testing;
 
 namespace ShortLink.Api.Tests;
 
@@ -241,5 +244,71 @@ public sealed class CreateLinkTests : IAsyncLifetime
         {
             Assert.Equal(JsonValueKind.Null, requestIdProp.ValueKind);
         }
+    }
+
+    // --- #4: DB failure injection ---
+
+    [Fact]
+    public async Task CreateLink_db_failure_returns_500_not_201()
+    {
+        await using var host = TestHostFactory.Create(svc =>
+            svc.Replace<ILinkStore>(new ThrowingLinkStore()));
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = JsonContent.Create(new { targetUrl = "https://example.com" });
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+    }
+
+    // --- #5: malformed / boundary inputs ---
+
+    [Fact]
+    public async Task CreateLink_wrong_content_type_returns_415()
+    {
+        // Minimal API rejects non-JSON content-type with 415 Unsupported Media Type.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = new StringContent("{\"targetUrl\":\"https://example.com\"}", Encoding.UTF8, "text/plain");
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateLink_truncated_json_returns_400()
+    {
+        // Incomplete JSON body — Minimal API returns 400 (body deserialization failure).
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = new StringContent("{", Encoding.UTF8, "application/json");
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateLink_targetUrl_over_2048_chars_returns_400()
+    {
+        // [StringLength(2048)] on CreateLinkRequest.TargetUrl — DataAnnotations validation fires.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var longUrl = "https://example.com/" + new string('a', 2040); // total 2060 chars > 2048
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
+        request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        request.Content = JsonContent.Create(new { targetUrl = longUrl });
+        var response = await host.Client.SendAsync(request, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

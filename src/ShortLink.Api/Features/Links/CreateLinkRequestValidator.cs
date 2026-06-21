@@ -79,8 +79,20 @@ public sealed class CreateLinkRequestValidator : ISliceValidator<CreateLinkReque
         }
 
         // IPv4 private ranges
+        // 0.0.0.0 — "this host on this network"; unroutable and meaningless as a redirect target.
+        if (bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0)
+        {
+            return true;
+        }
+
         // 10.0.0.0/8
         if (bytes[0] == 10)
+        {
+            return true;
+        }
+
+        // 169.254.0.0/16 — link-local (APIPA / cloud metadata, e.g. 169.254.169.254 on AWS/GCP/Azure).
+        if (bytes[0] == 169 && bytes[1] == 254)
         {
             return true;
         }

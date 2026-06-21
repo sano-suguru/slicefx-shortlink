@@ -136,4 +136,75 @@ public sealed class CreateLinkRequestValidatorTests
         var result = await ValidateAsync("http://[fe80::1]/secret", ct);
         Assert.False(result.IsValid);
     }
+
+    // --- Newly blocked ranges (0.0.0.0 and 169.254/16) ---
+
+    [Fact]
+    public async Task All_zero_0_0_0_0_fails()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await ValidateAsync("http://0.0.0.0/", ct);
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Link_local_169_254_169_254_fails()
+    {
+        // Cloud metadata endpoint on AWS/GCP/Azure — must be blocked as phishing redirect bait.
+        var ct = TestContext.Current.CancellationToken;
+        var result = await ValidateAsync("http://169.254.169.254/latest/meta-data/", ct);
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Link_local_169_254_0_1_fails()
+    {
+        // Any address in 169.254.0.0/16 is link-local.
+        var ct = TestContext.Current.CancellationToken;
+        var result = await ValidateAsync("http://169.254.0.1/", ct);
+        Assert.False(result.IsValid);
+    }
+
+    // --- IPv6 loopback fixed ---
+
+    [Fact]
+    public async Task IPv6_loopback_fails()
+    {
+        // ::1 is IPv6 loopback; already blocked via IPAddress.IsLoopback. Pinned as regression guard.
+        var ct = TestContext.Current.CancellationToken;
+        var result = await ValidateAsync("http://[::1]/admin", ct);
+        Assert.False(result.IsValid);
+    }
+
+    // --- Decimal / octal / hex IP literals: already covered by System.Uri normalization ---
+    // System.Uri.Host normalises these forms to dotted-quad BEFORE we call IPAddress.TryParse.
+    // e.g. "http://2130706433/" -> Host = "127.0.0.1" (IsLoopback = true).
+    // These tests document that the existing code handles them without any extra uint32 logic.
+
+    [Fact]
+    public async Task Decimal_ip_127_0_0_1_fails()
+    {
+        // 2130706433 = 127.0.0.1 in decimal. System.Uri normalises it to "127.0.0.1".
+        var ct = TestContext.Current.CancellationToken;
+        var result = await ValidateAsync("http://2130706433/", ct);
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Octal_ip_0177_0_0_1_fails()
+    {
+        // 0177.0.0.1 is octal-dotted for 127.0.0.1. System.Uri normalises it.
+        var ct = TestContext.Current.CancellationToken;
+        var result = await ValidateAsync("http://0177.0.0.1/secret", ct);
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Hex_ip_0x7f_0_0_1_fails()
+    {
+        // 0x7f.0.0.1 is hex-dotted for 127.0.0.1. System.Uri normalises it.
+        var ct = TestContext.Current.CancellationToken;
+        var result = await ValidateAsync("http://0x7f.0.0.1/secret", ct);
+        Assert.False(result.IsValid);
+    }
 }

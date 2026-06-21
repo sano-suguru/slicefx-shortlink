@@ -11,7 +11,7 @@ public record GetHealthResponse(string Status, DateTimeOffset At);
 // DataAnnotations from properties too, so validation generation is unaffected.
 public sealed class CreateLinkRequest
 {
-    [Required, Url]
+    [Required, Url, StringLength(2048)]
     public string TargetUrl { get; set; } = "";
 }
 

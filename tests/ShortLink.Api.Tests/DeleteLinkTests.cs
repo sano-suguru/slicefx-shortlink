@@ -87,4 +87,34 @@ public sealed class DeleteLinkTests : IAsyncLifetime
         var statsResp = await host.Client.SendAsync(statsReq, ct);
         Assert.Equal(HttpStatusCode.OK, statsResp.StatusCode);
     }
+
+    // --- #5: non-parseable route param ---
+
+    [Fact]
+    public async Task DeleteLink_non_numeric_id_with_valid_key_returns_400()
+    {
+        // Route param {id} is long — "abc" fails model binding → 400.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var req = new HttpRequestMessage(HttpMethod.Delete, "/api/links/abc");
+        req.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
+        var response = await host.Client.SendAsync(req, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteLink_non_numeric_id_without_key_returns_401()
+    {
+        // Auth filter runs before route-param binding. No key → 401, not 400.
+        // Pins the auth-before-binding execution order as a regression guard.
+        await using var host = TestHostFactory.Create();
+        var ct = TestContext.Current.CancellationToken;
+
+        var req = new HttpRequestMessage(HttpMethod.Delete, "/api/links/abc");
+        var response = await host.Client.SendAsync(req, ct);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }

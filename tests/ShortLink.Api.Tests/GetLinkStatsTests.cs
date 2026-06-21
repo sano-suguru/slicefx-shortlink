@@ -54,8 +54,11 @@ public sealed class GetLinkStatsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetLinkStats_wrong_owner_returns_404()
+    public async Task GetLinkStats_invalid_key_returns_401()
     {
+        // "not-the-owner" is not a registered API key → ApiKeyAuthFilter rejects with 401.
+        // Named "wrong_owner" previously but the key is outright invalid, not a cross-owner access.
+        // The strict 401 oracle documents this distinction.
         await using var host = TestHostFactory.Create();
         var ct = TestContext.Current.CancellationToken;
 
@@ -63,10 +66,7 @@ public sealed class GetLinkStatsTests : IAsyncLifetime
         statsReq.Headers.Add("X-Api-Key", "not-the-owner");
         var response = await host.Client.SendAsync(statsReq, ct);
 
-        // Either 401 (bad key) or 404 (not owned) — both are acceptable
-        Assert.True(
-            response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.NotFound,
-            $"Expected 401 or 404 but got {response.StatusCode}");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

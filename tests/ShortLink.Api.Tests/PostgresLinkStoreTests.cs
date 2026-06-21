@@ -156,4 +156,27 @@ public sealed class PostgresLinkStoreTests : DbBackedTest
         Assert.NotEqual(existingCode, link.Code);
         Assert.Equal("https://test.example.com", link.TargetUrl);
     }
+
+    [Fact]
+    public async Task CreateAsync_concurrent_same_initial_code_both_succeed_with_distinct_codes()
+    {
+        // Two callers race to insert with the same initial code.
+        // One wins the unique constraint; the other catches SqlState 23505 and retries
+        // with ShortCode.Generate(). Both should ultimately succeed with different codes.
+        // Passes the SAME fixed code at the store level — HTTP-level calls use random codes
+        // and cannot reliably reproduce the race condition.
+        var ct = TestContext.Current.CancellationToken;
+        const string sharedCode = "ZZZZZZZ";
+
+        var task1 = Store.CreateAsync("https://concurrent1.example.com", Owner1Hash, sharedCode, ct);
+        var task2 = Store.CreateAsync("https://concurrent2.example.com", Owner1Hash, sharedCode, ct);
+        var results = await Task.WhenAll(task1, task2);
+
+        Assert.Equal(2, results.Length);
+        Assert.All(results, r => Assert.True(r.Id > 0));
+        Assert.NotEqual(results[0].Code, results[1].Code);
+
+        var page = await Store.ListByOwnerAsync(Owner1Hash, page: 1, pageSize: 10, ct);
+        Assert.Equal(2, page.Count);
+    }
 }

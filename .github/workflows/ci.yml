@@ -91,6 +91,14 @@ jobs:
           print('All portability classifications match expected values.')
           "
 
+      - name: Check generated artifacts are up to date
+        run: |
+          dotnet tool run slicefx -- openapi --project src/ShortLink.Api --output docs/openapi.json --force
+          dotnet tool run slicefx -- client csharp --project src/ShortLink.Api \
+            --output src/ShortLink.ApiClient/SliceApiClient.g.cs --namespace ShortLink.Api.Client --force
+          git diff --exit-code -- docs/openapi.json src/ShortLink.ApiClient/SliceApiClient.g.cs \
+            || (echo "::error::Generated artifacts are stale. Run the slicefx openapi/client commands and commit." && exit 1)
+
       - name: Format check
         run: dotnet format ShortLink.slnx --verify-no-changes --severity info --exclude-diagnostics CS1591
 
