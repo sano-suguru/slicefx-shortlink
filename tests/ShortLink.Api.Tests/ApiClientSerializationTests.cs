@@ -1,6 +1,7 @@
 using System.Net;
 using ShortLink.Api.Client;
 using ShortLink.Contracts;
+#pragma warning disable JSON002 // raw JSON string literals are intentional mock data in this test file
 
 namespace ShortLink.Api.Tests;
 

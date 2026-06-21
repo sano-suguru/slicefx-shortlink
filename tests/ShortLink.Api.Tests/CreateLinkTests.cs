@@ -274,7 +274,7 @@ public sealed class CreateLinkTests : IAsyncLifetime
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/links");
         request.Headers.Add("X-Api-Key", TestDb.SeedApiKey);
-        request.Content = new StringContent("{\"targetUrl\":\"https://example.com\"}", Encoding.UTF8, "text/plain");
+        request.Content = new StringContent("targetUrl=https://example.com", Encoding.UTF8, "text/plain");
         var response = await host.Client.SendAsync(request, ct);
 
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
