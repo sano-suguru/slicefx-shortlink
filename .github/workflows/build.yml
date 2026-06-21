@@ -158,7 +158,7 @@ jobs:
           CODE=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['code'])")
           ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
           echo "Created code=$CODE id=$ID"
-          # Verify [FromHeader] binding in real NativeAOT binary — requestId must echo the header value.
+          # Verify [FromHeader] binding in real NativeAOT binary - requestId must echo the header value.
           echo "$RESP" | python3 -c "
 import json,sys
 d=json.load(sys.stdin)
