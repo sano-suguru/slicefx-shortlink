@@ -159,12 +159,7 @@ jobs:
           ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
           echo "Created code=$CODE id=$ID"
           # Verify [FromHeader] binding in real NativeAOT binary - requestId must echo the header value.
-          echo "$RESP" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-assert d.get('requestId')=='smoke-aot-header-123', f'[FromHeader] AOT binding failed: requestId={d.get(\"requestId\")!r}'
-print('[FromHeader] AOT binding: OK')
-"
+          echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); got=d.get('requestId'); assert got=='smoke-aot-header-123', '[FromHeader] AOT binding failed: requestId=' + repr(got); print('[FromHeader] AOT binding: OK')"
 
           echo "--- Follow link (expect 302, AOT Referer/User-Agent [FromHeader] binding) ---"
           curl -si http://localhost:8080/r/$CODE \
