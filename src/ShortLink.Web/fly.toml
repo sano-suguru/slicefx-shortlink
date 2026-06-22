@@ -2,7 +2,7 @@ app = "slicefx-shortlink-web"
 primary_region = "nrt"
 
 [build]
-  dockerfile = "src/ShortLink.Web/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 80

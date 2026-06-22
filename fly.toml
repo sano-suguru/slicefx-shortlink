@@ -28,11 +28,11 @@ primary_region = "nrt"
   path = "/health/ready"
   interval = "15s"
   timeout = "5s"
-  grace_period = "10s"
+  grace_period = "30s"
 
 [env]
   ASPNETCORE_URLS = "http://+:8080"
   # Set at deploy time (fly secrets set):
-  #   ConnectionStrings__Postgres  (Neon postgres:// URL — app normalizes to Npgsql keyword format)
-  #   SeedApiKey
-  #   BaseUrl  (e.g. https://slicefx-shortlink.fly.dev)
+  #   DATABASE_URL         (Neon postgres:// URI — Db.cs normalizes to Npgsql keyword format + SslMode=Require)
+  #   SeedApiKey           (admin API key; generate with: openssl rand -hex 32)
+  #   BaseUrl              (e.g. https://slicefx-shortlink.fly.dev — must match public hostname)

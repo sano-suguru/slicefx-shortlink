@@ -2,6 +2,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /repo
 
+# Emscripten (used by wasm-tools for native WASM asset compilation) requires python.
+# dotnet/sdk:10.0 is based on Ubuntu but ships without python.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install wasm-tools workload required for BlazorWebAssembly publish
 RUN dotnet workload install wasm-tools
 
