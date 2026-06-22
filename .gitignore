@@ -28,3 +28,6 @@ coverage/
 
 # Spike / scratch work
 spike/
+
+# Local secrets — never commit
+.env*
