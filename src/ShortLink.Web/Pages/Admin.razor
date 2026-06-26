@@ -11,7 +11,8 @@
     <h2>API Key</h2>
     <p class="hint">
         Key is stored in browser localStorage. This is a dogfooding convenience,
-        not a production security model.
+        not a production security model. (XSS would expose the key; accepted for
+        single-user dogfooding.)
     </p>
     <div class="field-row">
         <input type="password" placeholder="Enter API key" @bind="_apiKeyInput" @bind:event="oninput" />
@@ -23,122 +24,138 @@
     }
 </section>
 
-@* ── Create Link ── *@
-<section class="panel">
-    <h2>Create Short Link</h2>
-    <EditForm EditContext="_createEditContext" OnValidSubmit="CreateLinkAsync">
-        <DataAnnotationsValidator />
-        <div class="field">
-            <label for="targetUrl">Target URL</label>
-            <InputText id="targetUrl" @bind-Value="_createReq.TargetUrl" />
-            <ValidationMessage For="@(() => _createReq.TargetUrl)" />
-        </div>
-        <button type="submit" disabled="@_creating">@(_creating ? "Creating…" : "Create")</button>
-    </EditForm>
-    @if (_createError is not null)
-    {
-        <p class="error-msg">@_createError</p>
-    }
-    @if (_lastCreated is not null)
-    {
-        <div class="success-banner">
-            <strong>Created!</strong>
-            Short URL: <a href="@_lastCreated.ShortUrl" target="_blank">@_lastCreated.ShortUrl</a>
-            (code: <code>@_lastCreated.Code</code>)
-        </div>
-    }
-</section>
+@* ── Operations: shown only when a key has been entered.
+     This is a UX convenience — it skips guaranteed-401 calls and hides
+     dead controls when no key is configured. The API side enforces auth. ── *@
+@if (KeyConfigured)
+{
+    @* ── Create Link ── *@
+    <section class="panel">
+        <h2>Create Short Link</h2>
+        <EditForm EditContext="_createEditContext" OnValidSubmit="CreateLinkAsync">
+            <DataAnnotationsValidator />
+            <div class="field">
+                <label for="targetUrl">Target URL</label>
+                <InputText id="targetUrl" @bind-Value="_createReq.TargetUrl" />
+                <ValidationMessage For="@(() => _createReq.TargetUrl)" />
+            </div>
+            <button type="submit" disabled="@_creating">@(_creating ? "Creating…" : "Create")</button>
+        </EditForm>
+        @if (_createError is not null)
+        {
+            <p class="error-msg">@_createError</p>
+        }
+        @if (_lastCreated is not null)
+        {
+            <div class="success-banner">
+                <strong>Created!</strong>
+                Short URL: <a href="@_lastCreated.ShortUrl" target="_blank">@_lastCreated.ShortUrl</a>
+                (code: <code>@_lastCreated.Code</code>)
+            </div>
+        }
+    </section>
 
-@* ── Link List ── *@
-<section class="panel">
-    <h2>My Links</h2>
-    <div class="toolbar">
-        <button @onclick="LoadLinksAsync" disabled="@_loadingLinks">@(_loadingLinks ? "Loading…" : "Refresh")</button>
-        <span class="pager">
-            Page
-            <button @onclick="PrevPage" disabled="@(_page <= 1 || _loadingLinks)">&laquo;</button>
-            @_page
-            <button @onclick="NextPage" disabled="@(_loadingLinks)">&raquo;</button>
-            | PageSize:
-            <select @bind="_pageSize" @bind:after="ReloadLinksAsync">
-                <option value="10">10</option>
-                <option value="20" selected>20</option>
-                <option value="50">50</option>
-            </select>
-        </span>
-    </div>
+    @* ── Link List ── *@
+    <section class="panel">
+        <h2>My Links</h2>
+        <div class="toolbar">
+            <button @onclick="LoadLinksAsync" disabled="@_loadingLinks">@(_loadingLinks ? "Loading…" : "Refresh")</button>
+            <span class="pager">
+                Page
+                <button @onclick="PrevPage" disabled="@(_page <= 1 || _loadingLinks)">&laquo;</button>
+                @_page
+                <button @onclick="NextPage" disabled="@(_loadingLinks)">&raquo;</button>
+                | PageSize:
+                <select @bind="_pageSize" @bind:after="ReloadLinksAsync">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                </select>
+            </span>
+        </div>
 
-    @if (_listError is not null)
-    {
-        <p class="error-msg">@_listError</p>
-    }
-    else if (_links is not null)
-    {
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Code</th>
-                        <th>Short URL</th>
-                        <th>Target</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var link in _links.Items)
-                    {
+        @if (_listError is not null)
+        {
+            <p class="error-msg">@_listError</p>
+        }
+        else if (_links is not null)
+        {
+            <div class="table-wrap">
+                <table>
+                    <thead>
                         <tr>
-                            <td class="mono">@link.Id</td>
-                            <td><code>@link.Code</code></td>
-                            <td>
-                                @* Short URL links go directly to the API origin for the redirect *@
-                                <a href="@link.ShortUrl" target="_blank">@link.ShortUrl</a>
-                            </td>
-                            <td class="truncate" title="@link.TargetUrl">@link.TargetUrl</td>
-                            <td class="mono">@link.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td class="actions">
-                                <button class="btn-text" @onclick="() => LoadStatsAsync(link.Id)">Stats</button>
-                                <button @onclick="() => DeleteLinkAsync(link.Id)" class="btn-danger">Delete</button>
-                            </td>
+                            <th>ID</th>
+                            <th>Code</th>
+                            <th>Short URL</th>
+                            <th>Target</th>
+                            <th>Created</th>
+                            <th>Actions</th>
                         </tr>
-                        @if (_statsLinkId == link.Id && _stats is not null)
+                    </thead>
+                    <tbody>
+                        @foreach (var link in _links.Items)
                         {
-                            <tr class="stats-row">
-                                <td colspan="6">
-                                    <strong>Total clicks:</strong> @_stats.TotalClicks
-                                    @if (_stats.Daily.Count > 0)
-                                    {
-                                        <table class="daily-table">
-                                            <thead><tr><th>Date</th><th>Clicks</th></tr></thead>
-                                            <tbody>
-                                                @foreach (var d in _stats.Daily)
-                                                {
-                                                    <tr><td class="mono">@d.Date.ToString("yyyy-MM-dd")</td><td>@d.Count</td></tr>
-                                                }
-                                            </tbody>
-                                        </table>
-                                    }
-                                    else
-                                    {
-                                        <span> (no clicks yet)</span>
-                                    }
+                            <tr>
+                                <td class="mono">@link.Id</td>
+                                <td><code>@link.Code</code></td>
+                                <td>
+                                    @* Short URL links go directly to the API origin for the redirect *@
+                                    <a href="@link.ShortUrl" target="_blank">@link.ShortUrl</a>
+                                </td>
+                                <td class="truncate" title="@link.TargetUrl">@link.TargetUrl</td>
+                                <td class="mono">@link.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="actions">
+                                    <button class="btn-text" @onclick="() => LoadStatsAsync(link.Id)">Stats</button>
+                                    <button @onclick="() => DeleteLinkAsync(link.Id)" class="btn-danger">Delete</button>
                                 </td>
                             </tr>
+                            @if (_statsLinkId == link.Id && _stats is not null)
+                            {
+                                <tr class="stats-row">
+                                    <td colspan="6">
+                                        <strong>Total clicks:</strong> @_stats.TotalClicks
+                                        @if (_stats.Daily.Count > 0)
+                                        {
+                                            <table class="daily-table">
+                                                <thead><tr><th>Date</th><th>Clicks</th></tr></thead>
+                                                <tbody>
+                                                    @foreach (var d in _stats.Daily)
+                                                    {
+                                                        <tr><td class="mono">@d.Date.ToString("yyyy-MM-dd")</td><td>@d.Count</td></tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        }
+                                        else
+                                        {
+                                            <span> (no clicks yet)</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
                         }
-                    }
-                </tbody>
-            </table>
-        </div>
-        <p class="total">Total: @_links.TotalCount</p>
-    }
-</section>
+                    </tbody>
+                </table>
+            </div>
+            <p class="total">Total: @_links.TotalCount</p>
+        }
+    </section>
+}
+else
+{
+    <section class="panel">
+        <p class="hint">API キーを入力して保存すると、リンクの作成・一覧・統計・削除が使えます。</p>
+    </section>
+}
 
 @code {
     // ── API Key state ──
     private string _apiKeyInput = "";
     private bool _apiKeySaved;
+
+    // True when a key has been entered. Operations are hidden until this is true
+    // (UX: avoids guaranteed-401 calls and dead controls when no key is configured).
+    private bool KeyConfigured => !string.IsNullOrWhiteSpace(Keys.Current);
 
     // ── Create Link state ──
     private CreateLinkRequest _createReq = new();
@@ -170,7 +187,12 @@
             _apiKeyInput = stored;
         }
 
-        await LoadLinksAsync();
+        // Only load links when a key is already configured; skip the guaranteed-401
+        // that would occur when the page is opened without a key.
+        if (KeyConfigured)
+        {
+            await LoadLinksAsync();
+        }
     }
 
     private void InitCreateForm()
@@ -185,8 +207,26 @@
     private async Task SaveApiKeyAsync()
     {
         Keys.Current = _apiKeyInput;
-        await JS.InvokeVoidAsync("localStorage.setItem", "shortlink_api_key", _apiKeyInput);
-        _apiKeySaved = true;
+
+        if (KeyConfigured)
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "shortlink_api_key", _apiKeyInput);
+            _apiKeySaved = true;
+            await LoadLinksAsync();
+        }
+        else
+        {
+            // Empty save: clear persisted key and reset all state (simple "log out").
+            await JS.InvokeVoidAsync("localStorage.removeItem", "shortlink_api_key");
+            _apiKeySaved = false;
+            _links = null;
+            _stats = null;
+            _statsLinkId = null;
+            _lastCreated = null;
+            _listError = null;
+            _createError = null;
+        }
+
         StateHasChanged();
     }
 
@@ -212,7 +252,9 @@
         }
         catch (SliceApiClient.SliceApiException ex)
         {
-            _createError = ex.Message;
+            _createError = ex.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                ? "API キーが無効です。正しいキーを再入力してください。"
+                : ex.Message;
         }
         finally
         {
@@ -233,7 +275,9 @@
         }
         catch (SliceApiClient.SliceApiException ex)
         {
-            _listError = ex.Message;
+            _listError = ex.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                ? "API キーが無効です。正しいキーを再入力してください。"
+                : ex.Message;
         }
         finally
         {
@@ -279,7 +323,9 @@
         }
         catch (SliceApiClient.SliceApiException ex)
         {
-            _listError = $"Stats error: {ex.Message}";
+            _listError = ex.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                ? "API キーが無効です。正しいキーを再入力してください。"
+                : $"Stats error: {ex.Message}";
             _statsLinkId = null;
         }
     }
@@ -296,7 +342,9 @@
         }
         catch (SliceApiClient.SliceApiException ex)
         {
-            _listError = $"Delete error: {ex.Message}";
+            _listError = ex.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                ? "API キーが無効です。正しいキーを再入力してください。"
+                : $"Delete error: {ex.Message}";
         }
     }
 }
