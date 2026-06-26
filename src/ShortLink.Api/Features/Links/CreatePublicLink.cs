@@ -6,6 +6,7 @@ namespace ShortLink.Api.Features.Links;
 
 [Feature("POST /api/links/public", Summary = "Create a short link anonymously")]
 [SliceFilter<PublicCreateRateLimitFilter>]
+[SliceFilter<PublicCreateDailyGlobalRateLimitFilter>]
 public static class CreatePublicLink
 {
     public static async Task<SliceResult<CreatePublicLinkResponse>> Handle(

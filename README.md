@@ -176,6 +176,12 @@ Then deploy from the Actions tab → **Deploy** → **Run workflow**.
 
 **Logs.** `fly logs` (distroless + NativeAOT — no exec/shell access). **Backup.** Neon free tier has 7-day PITR.
 
+**Known accepted risks (dogfooding).** This is a single-user dogfooding deployment, not a hardened production service. Two risks are explicitly accepted:
+
+1. **Structural open redirector.** `GET /r/{code}` unconditionally redirects to any http(s) URL minted by `POST /api/links/public`. Malicious public URLs (phishing/spam laundering) are not blocked — `CreateLinkRequestValidator` only guards against private/loopback hosts. An attacker can freely mint `https://<fly-domain>/r/xxx → https://phishing.example`. Accepted because the domain is an unnamed `fly.dev` subdomain with no brand value; monitor and mitigate if the domain gets blocklisted.
+
+2. **localStorage API key.** The Web UI stores the API key in `localStorage`. XSS in the Blazor WASM app (or a compromised CDN asset) could exfiltrate the key and grant full CRUD over that owner's links. Accepted for single-user dogfooding.
+
 ## Structure
 
 ```

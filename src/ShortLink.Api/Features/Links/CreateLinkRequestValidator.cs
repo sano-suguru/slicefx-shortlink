@@ -13,6 +13,12 @@ namespace ShortLink.Api.Features.Links;
 // — it never fetches the target URL server-side. DNS rebinding is not defended
 // against by string-level host checks. This validator's primary purpose is to
 // exercise the ISliceValidator<T> execution path under ASP.NET NativeAOT (#4).
+//
+// KNOWN RISK (accepted): anonymous creation + unconditional redirect makes this
+// service a structural open redirector. Malicious public URLs (phishing/spam) pass
+// through; only private/loopback hosts are blocked. This is intentionally accepted
+// for single-user dogfooding on an unnamed fly.dev domain. Do not use this code
+// as-is for a high-traffic or brand-sensitive production deployment.
 public sealed class CreateLinkRequestValidator : ISliceValidator<CreateLinkRequest>
 {
     private static readonly string[] AllowedSchemes = ["http", "https"];

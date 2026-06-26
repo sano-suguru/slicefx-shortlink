@@ -33,6 +33,13 @@ public abstract partial class SlidingWindowRateLimitFilter(
     /// <summary>Length of each rate-limit window. Defaults to 1 minute.</summary>
     protected virtual TimeSpan Window => TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    /// The bucket key used to partition rate-limit state within a <see cref="Partition"/>.
+    /// Defaults to the client IP (or <c>"unknown"</c> when the IP cannot be resolved).
+    /// Override to return a fixed string for a global (cross-IP) limit.
+    /// </summary>
+    protected virtual string GetBucketKey(string? clientIp) => clientIp ?? "unknown";
+
     [LoggerMessage(Level = LogLevel.Warning,
         Message = "RateLimit[{partition}]: ClientIp is null — UseForwardedHeaders may be " +
                   "misconfigured or the client connected directly. Falling back to 'unknown' bucket.")]
@@ -41,12 +48,14 @@ public abstract partial class SlidingWindowRateLimitFilter(
     public async ValueTask<SliceFilterResult> InvokeAsync(SliceFilterContext context, SliceFilterDelegate next)
     {
         var ip = context.ClientIp;
-        if (ip is null)
+        var clientKey = GetBucketKey(ip);
+
+        // Warn only when the default per-IP bucket is used but the IP is unavailable.
+        // Subclasses that return a fixed key (e.g. "global") don't need this warning.
+        if (ip is null && clientKey == "unknown")
         {
             LogClientIpNull(logger, Partition);
         }
-
-        var clientKey = ip ?? "unknown";
         var now = time.GetUtcNow();
         var decision = store.Consume(Partition, clientKey, Limit, Window, now);
 
