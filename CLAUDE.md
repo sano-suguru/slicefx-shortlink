@@ -4,7 +4,7 @@
 
 URL shortener + click analytics app, dogfooding [SliceFx](https://github.com/sano-suguru/slicefx) on the **ASP.NET Core NativeAOT** path (the framework's primary target). Paired with `slicefx-inbox` which covers the WASI/Spin path.
 
-Deploy target: distroless container (linux-x64 NativeAOT binary) for the API; nginx:alpine static container for the Blazor WASM admin UI.
+Deploy target: API runs as a prebuilt NativeAOT distroless container image (linux-x64) on Render, pulled from GHCR; the Blazor WASM admin UI is a static site on Cloudflare Pages.
 
 Backend: `src/ShortLink.Api/` — SliceFx ASP.NET NativeAOT app + Postgres (raw Npgsql).
 Shared types: `src/ShortLink.Contracts/` — zero-dependency DTOs shared by Server and Client.
@@ -41,7 +41,7 @@ docker build --platform linux/amd64 -f src/ShortLink.Api/Dockerfile -t shortlink
 docker run --rm -p 8080:8080 shortlink-api
 curl http://localhost:8080/health
 
-# Docker build for Web (nginx static host)
+# Docker build for Web (legacy nginx static host; unused by deploy.yml, kept for local smoke only)
 docker build -f src/ShortLink.Web/Dockerfile -t shortlink-web .
 docker run --rm -p 8081:80 shortlink-web
 
@@ -104,11 +104,11 @@ src/ShortLink.Web/
   ApiKeyProvider.cs                 in-memory API key holder (singleton)
   ApiKeyHandler.cs                  DelegatingHandler attaching X-Api-Key header synchronously
   Pages/Links.razor                 single-page admin UI (CRUD + stats + pagination)
-  wwwroot/appsettings.json          ApiBaseUrl = https://slicefx-shortlink.fly.dev (prod)
+  wwwroot/appsettings.json          ApiBaseUrl = Render API URL (prod)
   wwwroot/appsettings.Development.json  ApiBaseUrl = http://localhost:5200 (dev)
-  nginx.conf                        SPA fallback, wasm MIME, compression
-  Dockerfile                        sdk build → nginx:alpine static host
-  fly.toml                          Fly app: slicefx-shortlink-web, nrt, port 80
+  wwwroot/_redirects                SPA fallback for Cloudflare Pages
+  wwwroot/_headers                  Cloudflare Pages cache policy
+  nginx.conf, Dockerfile, fly.toml  legacy Fly/nginx artifacts, unused by deploy.yml (removal pending)
 ```
 
 ## Key constraints (NativeAOT)
@@ -136,22 +136,17 @@ After changing any feature request/response shapes:
 
 The API key is stored in browser `localStorage` for convenience. This is a **dogfooding setup**, not a
 production security model. In production, replace localStorage with a proper auth flow (e.g. OIDC).
-The admin UI lives on a separate Fly.io app (`slicefx-shortlink-web`) and communicates with the API
-via CORS-enabled requests. Both CORS origins (localhost dev + Fly prod) are hardcoded in `Program.cs`.
+The admin UI is a separate Cloudflare Pages site and communicates with the API
+via CORS-enabled requests. Allowed origins come from the `CORS_ALLOWED_ORIGINS` env var (comma-separated).
 
 ## CORS configuration
 
 Configured in `src/ShortLink.Api/Program.cs`:
-- `AllowedOrigins`: `http://localhost:5201` + `https://slicefx-shortlink-web.fly.dev`
+- `AllowedOrigins`: parsed from `CORS_ALLOWED_ORIGINS` env var (comma-separated); dev default is localhost
 - `AllowAnyHeader()` — required for X-Api-Key CORS preflight
 - `AllowAnyMethod()` — allows OPTIONS preflight
 SliceFx does not generate OPTIONS routes; CORS middleware handles preflights.
 
 ## Deploy
 
-Two Fly.io apps:
-- `slicefx-shortlink` — NativeAOT API, `fly.toml` at root
-- `slicefx-shortlink-web` — Blazor WASM static site, `fly.toml` at `src/ShortLink.Web/fly.toml`
-
-Deploy workflow (`.github/workflows/deploy.yml`): deploys both in sequence.
-Web requires wasm-tools workload at build time (handled in `Dockerfile` and `ci.yml`).
+Production deploys automatically on push to `main` via `.github/workflows/deploy.yml`: the API is a prebuilt NativeAOT distroless image pushed to GHCR (`ghcr.io/sano-suguru/slicefx-shortlink-api`) and pulled by a Render Web Service (Singapore); the Blazor WASM admin UI is built and published as a static site to Cloudflare Pages (`slicefx-shortlink-web.pages.dev`); Neon Postgres is unchanged. See `README.md`'s "Deployment" section and `docs/superpowers/specs/2026-07-10-render-pages-migration-design.md` for the full topology and runbook.
