@@ -115,6 +115,14 @@ by `.github/workflows/deploy.yml`:
 See `docs/superpowers/specs/2026-07-10-render-pages-migration-design.md` for the
 full design and cutover runbook.
 
+## Known accepted risks (dogfooding)
+
+This is a single-user dogfooding deployment, not a hardened production service. Two risks are explicitly accepted:
+
+1. **Structural open redirector.** `GET /r/{code}` unconditionally redirects to any http(s) URL minted by `POST /api/links/public`. Malicious public URLs (phishing/spam laundering) are not blocked — `CreateLinkRequestValidator` only guards against private/loopback hosts. An attacker can freely mint `https://<render-domain>/r/xxx → https://phishing.example`. Accepted because the domain is an auto-assigned `slicefx-shortlink-api.onrender.com` subdomain with no brand value; monitor and mitigate if the domain gets blocklisted.
+
+2. **localStorage API key.** The Web UI stores the API key in `localStorage`. XSS in the Blazor WASM app (or a compromised CDN asset) could exfiltrate the key and grant full CRUD over that owner's links. Accepted for single-user dogfooding.
+
 ## Structure
 
 ```
