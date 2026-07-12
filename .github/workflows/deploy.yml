@@ -48,6 +48,12 @@ jobs:
         run: |
           set +x
           # The hook URL already carries "?key=..."; append imgURL with "&".
+          # Fail fast if the secret is a bare URL with no query string, else the
+          # "&imgURL=" concatenation would produce a malformed request.
+          case "$HOOK" in
+            *\?*) ;;
+            *) echo "RENDER_DEPLOY_HOOK_URL must include a query string (e.g. ?key=...)" >&2; exit 1 ;;
+          esac
           # Render requires the imgURL VALUE to be URL-encoded (it contains "/" and ":").
           # jq is preinstalled on ubuntu-latest; @uri percent-encodes the string.
           IMG_ENC=$(printf '%s' "$IMG" | jq -sRr @uri)
