@@ -324,7 +324,7 @@ git commit -m "feat(api): inject-able async retry helper"
 ### Task 4: Wire Program.cs (CORS env, bootstrap retry, forwarded-headers comment)
 
 **Files:**
-- Modify: `src/ShortLink.Api/Program.cs:24-29` (CORS), `:33-44` (comment), `:48-50` (bootstrap)
+- Modify: `src/ShortLink.Api/Program.cs:24-29` (CORS), `:33-36` (comment), `:50` (bootstrap)
 
 **Interfaces:**
 - Consumes: `CorsOrigins.Parse` (Task 2), `Retry.RunAsync` (Task 3), existing `Db.BootstrapAsync(NpgsqlDataSource, string, CancellationToken = default)`.
@@ -451,9 +451,9 @@ Run:
 dotnet workload install wasm-tools
 dotnet publish src/ShortLink.Web -c Release -o out
 ls out/wwwroot/_redirects out/wwwroot/_headers
-find out/wwwroot -name '*.br' -o -name '*.gz' | head
+find out/wwwroot \( -name '*.br' -o -name '*.gz' \) | head
 ```
-Expected: `_redirects` and `_headers` exist in `out/wwwroot`; the `find` prints **nothing** (no pre-compressed assets).
+Expected: `_redirects` and `_headers` exist in `out/wwwroot`; the `find` prints **nothing** (no pre-compressed assets). Note the `\( … \)` grouping — without it, `find`'s implicit `-print` binds only to the `-o` right operand and silently misses `*.br` files.
 If `.br`/`.gz` still appear, replace `<CompressionEnabled>false</CompressionEnabled>` with `<BlazorEnableCompression>false</BlazorEnableCompression>` and re-run this step until the `find` is empty.
 
 - [ ] **Step 6: Commit**
@@ -529,7 +529,10 @@ jobs:
         run: |
           set +x
           # The hook URL already carries "?key=..."; append imgURL with "&".
-          curl -fsSL -X POST "${HOOK}&imgURL=${IMG}"
+          # Render requires the imgURL VALUE to be URL-encoded (it contains "/" and ":").
+          # jq is preinstalled on ubuntu-latest; @uri percent-encodes the string.
+          IMG_ENC=$(printf '%s' "$IMG" | jq -sRr @uri)
+          curl -fsSL -X POST "${HOOK}&imgURL=${IMG_ENC}"
 
   deploy-web:
     name: Deploy Web to Cloudflare Pages
@@ -637,7 +640,7 @@ The first successful `deploy-api` run creates the GHCR package. Plan to set the 
 
 - [ ] **Step 2: Create the Render Web Service**
 
-In the Render dashboard: New → Web Service → **Deploy an existing image** → `ghcr.io/sano-suguru/slicefx-shortlink-api:latest`. Region **Singapore**. Instance type **Free**. Set environment variables:
+In the Render dashboard: New → Web Service → **Deploy an existing image** → `ghcr.io/sano-suguru/slicefx-shortlink-api:latest`. Region **Singapore**. Instance type **Free**. (The service's default image URL must be exactly `ghcr.io/sano-suguru/slicefx-shortlink-api` — Render rejects a deploy-hook `imgURL` whose base path differs from the default; only the tag/digest may differ.) Set environment variables:
 - `DATABASE_URL` = the Neon `postgres://…` URI (same as Fly used)
 - `SeedApiKey` = the existing seed admin key (reuse the Fly value to keep the current key working)
 - `BaseUrl` = the service's own public URL, e.g. `https://slicefx-shortlink-api.onrender.com` (set after the URL is known; must match exactly)
@@ -648,7 +651,7 @@ Set **Health Check Path** = `/health`. Copy the **Deploy Hook URL** (Settings �
 
 - [ ] **Step 3: Create the Cloudflare Pages project + API token**
 
-In Cloudflare dashboard: Workers & Pages → Create → Pages → **Direct Upload** → name it `slicefx-shortlink-web` (this reserves `slicefx-shortlink-web.pages.dev` and lets the workflow deploy to it). Create an API token with **Cloudflare Pages: Edit** permission; note the token and your **Account ID**.
+In Cloudflare dashboard: Workers & Pages → Create → Pages → **Direct Upload** → name it `slicefx-shortlink-web` (this reserves `slicefx-shortlink-web.pages.dev` and lets the workflow deploy to it). **Set the project's Production branch to `main`** (Settings → Builds & deployments) so the workflow's `--branch=main` deploys to production (`*.pages.dev`) rather than a preview URL. Create an API token with **Cloudflare Pages: Edit** permission; note the token and your **Account ID**.
 
 - [ ] **Step 4: Register GitHub Secrets**
 
@@ -657,9 +660,11 @@ In the repo → Settings → Secrets and variables → Actions, add:
 - `CLOUDFLARE_API_TOKEN` = the token from Step 3
 - `CLOUDFLARE_ACCOUNT_ID` = the account ID from Step 3
 
-- [ ] **Step 5: Confirm readiness**
+- [ ] **Step 5: Confirm readiness and reconcile hostnames**
 
-Verify all three secrets exist, the Render service and Pages project are created, and `BaseUrl`/`CORS_ALLOWED_ORIGINS` reflect the actual assigned hostnames (correct them if Render/Pages assigned different names).
+Verify all three secrets exist and the Render service + Pages project are created. Then reconcile the actual assigned hostnames (Render appends a suffix if the service name was taken):
+- `BaseUrl` and `CORS_ALLOWED_ORIGINS` (Render env) reflect the real Render/Pages URLs.
+- **`src/ShortLink.Web/wwwroot/appsettings.json` `ApiBaseUrl` equals the real Render URL.** Task 5 hardcoded the proposed URL; if the assigned Render URL differs, update this file on `feat/migrate-render-pages` and commit before Task 9 (the Pages deploy in Task 9 ships whatever `appsettings.json` is on `main`).
 
 ---
 
@@ -669,7 +674,7 @@ Verify all three secrets exist, the Render service and Pages project are created
 
 - [ ] **Step 1: Merge the branch to main**
 
-Open a PR from `feat/migrate-render-pages`, ensure CI is green, and merge. The push to `main` triggers `deploy.yml` (both jobs).
+Open a PR from `feat/migrate-render-pages`, ensure CI (`build.yml`) is green, and merge. The push to `main` triggers `deploy.yml` (both jobs). Note: `deploy.yml` runs on push to `main` independently of `build.yml` (no `needs`/gate between workflows); merging only after CI is green is a manual discipline. Optionally add a branch-protection rule requiring the CI check before merge to enforce it.
 
 - [ ] **Step 2: Watch the deploy**
 
