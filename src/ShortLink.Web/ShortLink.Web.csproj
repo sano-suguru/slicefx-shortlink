@@ -4,6 +4,8 @@
     <RootNamespace>ShortLink.Web</RootNamespace>
     <!-- CS1591: XML doc comments not required -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Cloudflare Pages compresses at the edge; skip Blazor's build-time .br/.gz assets. -->
+    <CompressionEnabled>false</CompressionEnabled>
   </PropertyGroup>
 
   <ItemGroup>

@@ -65,6 +65,7 @@ public static class Db
             Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : null,
             Database = Uri.UnescapeDataString(u.AbsolutePath.TrimStart('/')),
             SslMode = SslMode.Require,
+            Timeout = 30,
         };
         return b.ConnectionString;
     }

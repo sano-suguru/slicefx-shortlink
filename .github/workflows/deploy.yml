@@ -1,33 +1,84 @@
 name: Deploy
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: Target environment
-        required: true
-        default: production
-        type: choice
-        options: [production]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy to Fly.io
+  deploy-api:
+    name: Deploy API to Render
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Deploy API
-        run: flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy Web
-        run: flyctl deploy --remote-only -c src/ShortLink.Web/fly.toml
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/ShortLink.Api/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/sano-suguru/slicefx-shortlink-api:${{ github.sha }}
+            ghcr.io/sano-suguru/slicefx-shortlink-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trigger Render deploy (sha-pinned)
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          IMG: ghcr.io/sano-suguru/slicefx-shortlink-api:${{ github.sha }}
+        run: |
+          set +x
+          # The hook URL already carries "?key=..."; append imgURL with "&".
+          # Fail fast if the secret is a bare URL with no query string, else the
+          # "&imgURL=" concatenation would produce a malformed request.
+          case "$HOOK" in
+            *\?*) ;;
+            *) echo "RENDER_DEPLOY_HOOK_URL must include a query string (e.g. ?key=...)" >&2; exit 1 ;;
+          esac
+          # Render requires the imgURL VALUE to be URL-encoded (it contains "/" and ":").
+          # jq is preinstalled on ubuntu-latest; @uri percent-encodes the string.
+          IMG_ENC=$(printf '%s' "$IMG" | jq -sRr @uri)
+          curl -fsSL -X POST "${HOOK}&imgURL=${IMG_ENC}"
+
+  deploy-web:
+    name: Deploy Web to Cloudflare Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Publish Blazor WASM
+        run: dotnet publish src/ShortLink.Web -c Release -o out
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.90.0"
+          command: pages deploy out/wwwroot --project-name=slicefx-shortlink-web --branch=main

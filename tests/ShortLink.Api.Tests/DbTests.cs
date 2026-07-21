@@ -101,4 +101,17 @@ public sealed class DbTests
         Assert.Contains("5433", result);
         Assert.Contains("appdb", result, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void ResolveConnectionString_sets_connection_timeout_for_DATABASE_URL()
+    {
+        var config = BuildConfig(new Dictionary<string, string?>
+        {
+            ["DATABASE_URL"] = "postgres://user:pass@db.example.com:5432/mydb",
+        });
+
+        var result = Db.ResolveConnectionString(config);
+
+        Assert.Contains("Timeout=30", result);
+    }
 }
