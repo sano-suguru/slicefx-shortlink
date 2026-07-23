@@ -24,10 +24,10 @@ class PagesRoutingContractTests(unittest.TestCase):
 
         self.assertNotIn("/*", sources)
 
-    def test_admin_route_is_rewritten_to_index(self) -> None:
+    def test_admin_route_is_proxied_to_root_document(self) -> None:
         fields = [line.split() for line in redirect_lines()]
 
-        self.assertIn(["/admin", "/index.html", "200"], fields)
+        self.assertIn(["/admin", "/", "200"], fields)
 
     def test_top_level_404_exists(self) -> None:
         self.assertTrue(NOT_FOUND.is_file())

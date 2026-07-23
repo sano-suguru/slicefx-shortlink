@@ -83,12 +83,14 @@ Replace the catch-all redirect with the only non-root client route currently
 used by the application:
 
 ```text
-/admin    /index.html    200
+/admin    /    200
 ```
 
-The root continues to resolve to `index.html`, direct `/admin` navigation
-continues to start Blazor, and missing `/_framework` files no longer masquerade
-as successful HTML responses.
+The root continues to resolve to `index.html`. Proxying `/admin` to `/` avoids
+Cloudflare Pages canonicalizing `/index.html` into a 308 redirect that would
+discard the client route. Direct `/admin` navigation therefore continues to
+start Blazor at the original URL, and missing `/_framework` files no longer
+masquerade as successful HTML responses.
 
 ## Testing
 

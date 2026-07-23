@@ -19,6 +19,9 @@ out/
 __pycache__/
 *.py[cod]
 
+# Cloudflare local development
+.wrangler/
+
 # OS
 .DS_Store
 Thumbs.db
