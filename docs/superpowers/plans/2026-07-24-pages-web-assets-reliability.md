@@ -189,7 +189,7 @@ missing verification stages.
 Set `_redirects` to:
 
 ```text
-/admin    /index.html    200
+/admin    /    200
 ```
 
 Add a minimal static `404.html` with a UTF-8 declaration, `noindex`, a concise
