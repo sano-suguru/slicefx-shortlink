@@ -75,10 +75,45 @@ jobs:
       - name: Publish Blazor WASM
         run: dotnet publish src/ShortLink.Web -c Release -o out
 
-      - name: Deploy to Cloudflare Pages
+      - name: Verify published Web assets
+        run: python3 scripts/verify_web_assets.py --directory out/wwwroot
+
+      - name: Deploy preview to Cloudflare Pages
+        id: preview_deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "3.90.0"
+          wranglerVersion: "4.113.0"
+          command: pages deploy out/wwwroot --project-name=slicefx-shortlink-web --branch=asset-smoke-${{ github.sha }}
+
+      - name: Verify preview Web assets
+        env:
+          DEPLOYMENT_URL: ${{ steps.preview_deploy.outputs.deployment-url }}
+        run: |
+          test -n "$DEPLOYMENT_URL"
+          python3 scripts/verify_web_assets.py \
+            --directory out/wwwroot \
+            --base-url "$DEPLOYMENT_URL" \
+            --attempts 10 \
+            --delay 3
+
+      - name: Deploy production to Cloudflare Pages
+        id: production_deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.113.0"
           command: pages deploy out/wwwroot --project-name=slicefx-shortlink-web --branch=main
+
+      - name: Verify production Web assets
+        env:
+          DEPLOYMENT_URL: ${{ steps.production_deploy.outputs.deployment-url }}
+        run: |
+          test -n "$DEPLOYMENT_URL"
+          python3 scripts/verify_web_assets.py \
+            --directory out/wwwroot \
+            --base-url "$DEPLOYMENT_URL" \
+            --attempts 10 \
+            --delay 3
