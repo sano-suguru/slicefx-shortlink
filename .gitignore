@@ -15,6 +15,10 @@ out/
 .idea/
 *.DotSettings.user
 
+# Python deployment checks
+__pycache__/
+*.py[cod]
+
 # OS
 .DS_Store
 Thumbs.db
